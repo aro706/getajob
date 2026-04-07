@@ -5,7 +5,7 @@ async function generateEmbedding(text) {
     // 1. Initialize inside the function so dotenv is guaranteed to be loaded
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     
-    // 2. FIXED: Use the exact same model we successfully used in seedRoles.js!
+    // 2. Use the correct, active 2026 model
     const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
     
     // 3. Generate the vector

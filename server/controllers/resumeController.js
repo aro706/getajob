@@ -8,6 +8,7 @@ const uploadResume = async (req, res) => {
     }
 
     console.log("1. Extracting, generating embedding, and SAVING to database...");
+    // FIXED: Call the function directly!
     const savedResume = await processResume(req.file);
 
     console.log(`-> Saved to DB with ID: ${savedResume._id}`);
@@ -15,7 +16,6 @@ const uploadResume = async (req, res) => {
     console.log("2. Calculating match scores against database roles...");
     const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
 
-    // THIS is the crucial part that sends the clean data back to Postman!
     res.json({
       message: "Resume processed, saved to DB, and matched successfully!",
       data: {
@@ -24,7 +24,7 @@ const uploadResume = async (req, res) => {
           skills: savedResume.skills,
           experience: savedResume.experience
         },
-        topMatches: matchedRoles // This outputs your best job titles!
+        topMatches: matchedRoles // Outputs best job titles!
       }
     });
 

@@ -1,8 +1,8 @@
-import pdf from "pdf-parse/lib/pdf-parse.js";
+import pdf from "pdf-parse/lib/pdf-parse.js"; // FIXED: The bypass trick!
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import generateEmbedding from "./embeddingService.js";
-import Resume from "../models/Resume.js"; // IMPORTING THE NEW MODEL!
+import generateEmbedding from "./embeddingService.js"; // FIXED import
+import Resume from "../models/Resume.js"; 
 
 // ---------- EXTRACT TEXT ----------
 async function extractText(file) {
@@ -24,6 +24,7 @@ async function extractText(file) {
 
 // ---------- PARSE USING GEMINI ----------
 async function parseResume(text) {
+  // FIXED: Initialize genAI inside the function!
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   
   const model = genAI.getGenerativeModel({
@@ -69,7 +70,7 @@ async function processResume(file) {
   // 2. Parse into JSON
   const parsed = await parseResume(text);
 
-  // 3. Generate Embedding Vector
+  // 3. Generate Embedding Vector (Fixed function call)
   const embedding = await generateEmbedding(JSON.stringify(parsed));
 
   // 4. SAVE TO MONGODB
@@ -81,7 +82,6 @@ async function processResume(file) {
 
   const savedResume = await newResume.save();
 
-  // Return the database document (which now has an _id!)
   return savedResume; 
 }
 
