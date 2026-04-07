@@ -1,14 +1,12 @@
-import pdfParse from "pdf-parse";
+import pdf from "pdf-parse/lib/pdf-parse.js"; // Keeping our PDF bug fix
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import embeddingService from "./embeddingService.js";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+import generateEmbedding from "./embeddingService.js";
 
 // ---------- EXTRACT TEXT ----------
 async function extractText(file) {
   if (file.mimetype === "application/pdf") {
-    const data = await pdfParse(file.buffer);
+    const data = await pdf(file.buffer);
     return data.text;
   }
 
@@ -20,11 +18,14 @@ async function extractText(file) {
     return result.value;
   }
 
-  throw new Error("Unsupported file format");
+  throw new Error("Unsupported file format. Please upload a PDF or DOCX.");
 }
 
 // ---------- PARSE USING GEMINI ----------
 async function parseResume(text) {
+  // FIXED: Moved genAI initialization INSIDE the function so dotenv is loaded!
+  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash"
   });
@@ -62,14 +63,15 @@ ${text}
 }
 
 // ---------- MAIN ----------
-async function resumeService(file) {
+async function processResume(file) {
+  // 1. Extract text
   const text = await extractText(file);
 
+  // 2. Parse into JSON
   const parsed = await parseResume(text);
 
-  const embedding = await embeddingService.generateEmbedding(
-    JSON.stringify(parsed)
-  );
+  // 3. Generate Embedding Vector
+  const embedding = await generateEmbedding(JSON.stringify(parsed));
 
   return {
     parsed,
@@ -77,4 +79,4 @@ async function resumeService(file) {
   };
 }
 
-export default resumeService;
+export default processResume;

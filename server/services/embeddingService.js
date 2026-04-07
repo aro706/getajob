@@ -1,22 +1,20 @@
-import axios from "axios";
-
-const API_KEY = process.env.GEMINI_API_KEY;
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 async function generateEmbedding(text) {
   try {
-    const res = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedContent?key=${API_KEY}`,
-      {
-        content: {
-          parts: [{ text }]
-        }
-      }
-    );
-
-    return res.data.embedding.values;
+    // 1. Initialize inside the function so dotenv is guaranteed to be loaded
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    
+    // 2. FIXED: Use the exact same model we successfully used in seedRoles.js!
+    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+    
+    // 3. Generate the vector
+    const result = await model.embedContent(text);
+    
+    return result.embedding.values;
 
   } catch (err) {
-    console.error("Embedding Error:", err.response?.data || err.message);
+    console.error("Embedding Error:", err);
     throw new Error("Embedding failed");
   }
 }

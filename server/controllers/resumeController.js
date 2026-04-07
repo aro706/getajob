@@ -1,4 +1,4 @@
-import resumeService from "../services/resumeService.js";
+import processResume from "../services/resumeService.js";
 
 const uploadResume = async (req, res) => {
   try {
@@ -6,7 +6,8 @@ const uploadResume = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const result = await resumeService(req.file);
+    // Fixed: Call processResume directly
+    const result = await processResume(req.file);
 
     res.json({
       message: "Resume processed successfully",
@@ -14,9 +15,9 @@ const uploadResume = async (req, res) => {
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Resume Controller Error:", err);
     res.status(500).json({ error: "Processing failed" });
   }
 };
 
-export default uploadResume
+export default uploadResume;
