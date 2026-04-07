@@ -1,4 +1,5 @@
 import processResume from "../services/resumeService.js";
+import { findTopMatchingRoles } from "../services/matchService.js";
 
 const uploadResume = async (req, res) => {
   try {
@@ -6,12 +7,25 @@ const uploadResume = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    // Fixed: Call processResume directly
-    const result = await processResume(req.file);
+    console.log("1. Extracting, generating embedding, and SAVING to database...");
+    const savedResume = await processResume(req.file);
 
+    console.log(`-> Saved to DB with ID: ${savedResume._id}`);
+
+    console.log("2. Calculating match scores against database roles...");
+    const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
+
+    // THIS is the crucial part that sends the clean data back to Postman!
     res.json({
-      message: "Resume processed successfully",
-      data: result
+      message: "Resume processed, saved to DB, and matched successfully!",
+      data: {
+        resumeId: savedResume._id,
+        parsedResume: {
+          skills: savedResume.skills,
+          experience: savedResume.experience
+        },
+        topMatches: matchedRoles // This outputs your best job titles!
+      }
     });
 
   } catch (err) {

@@ -1,10 +1,10 @@
 /**
  * Calculates the cosine similarity between two vectors.
- * Returns a score between -1 and 1 (1 meaning identical direction/perfect match).
+ * Returns a score between -1 and 1.
  */
 export function cosineSimilarity(vecA, vecB) {
   if (!vecA || !vecB || vecA.length !== vecB.length) {
-    throw new Error("Vectors must be defined and of the same length.");
+    return 0; // Return 0 if vectors are invalid or don't match in size
   }
 
   let dotProduct = 0;

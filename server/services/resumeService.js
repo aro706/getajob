@@ -1,7 +1,8 @@
-import pdf from "pdf-parse/lib/pdf-parse.js"; // Keeping our PDF bug fix
+import pdf from "pdf-parse/lib/pdf-parse.js";
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import generateEmbedding from "./embeddingService.js";
+import Resume from "../models/Resume.js"; // IMPORTING THE NEW MODEL!
 
 // ---------- EXTRACT TEXT ----------
 async function extractText(file) {
@@ -23,7 +24,6 @@ async function extractText(file) {
 
 // ---------- PARSE USING GEMINI ----------
 async function parseResume(text) {
-  // FIXED: Moved genAI initialization INSIDE the function so dotenv is loaded!
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   
   const model = genAI.getGenerativeModel({
@@ -53,7 +53,6 @@ ${text}
   const result = await model.generateContent(prompt);
   let output = result.response.text();
 
-  // Clean JSON
   output = output.replace(/```json/g, "").replace(/```/g, "").trim();
 
   const match = output.match(/\{[\s\S]*\}/);
@@ -73,10 +72,17 @@ async function processResume(file) {
   // 3. Generate Embedding Vector
   const embedding = await generateEmbedding(JSON.stringify(parsed));
 
-  return {
-    parsed,
-    embedding
-  };
+  // 4. SAVE TO MONGODB
+  const newResume = new Resume({
+    skills: parsed.skills || [],
+    experience: parsed.experience || [],
+    embedding: embedding
+  });
+
+  const savedResume = await newResume.save();
+
+  // Return the database document (which now has an _id!)
+  return savedResume; 
 }
 
 export default processResume;
