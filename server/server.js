@@ -8,6 +8,8 @@ import express from "express";
 import cors from "cors";
 import connectDB from "./config/db.js";
 
+import resumeRoutes from "./routes/resumeRoutes.js";
+
 const app = express();
 
 // 🔍 DEBUG (remove later)
@@ -25,8 +27,20 @@ app.get("/", (req, res) => {
   res.send("API running");
 });
 
+
+
+// ---------------- ROUTES ----------------
+app.get("/", (req, res) => {
+  res.send("API running");
+});
+
+// ✅ ADD THIS
+app.use("/api/resume", resumeRoutes);
+
+
+
 // ---------------- SERVER ----------------
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

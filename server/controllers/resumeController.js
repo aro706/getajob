@@ -6,7 +6,7 @@ const uploadResume = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const result = await resumeService.processResume(req.file);
+    const result = await resumeService(req.file);
 
     res.json({
       message: "Resume processed successfully",

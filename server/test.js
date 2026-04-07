@@ -1,3 +1,0 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-console.log("Package installed successfully");
