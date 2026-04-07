@@ -21,4 +21,4 @@ async function generateEmbedding(text) {
   }
 }
 
-export default { generateEmbedding };
+export default generateEmbedding;

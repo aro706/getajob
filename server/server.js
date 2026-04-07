@@ -1,11 +1,12 @@
-const dns = require("dns");
+import dns from "dns";
 dns.setDefaultResultOrder("ipv4first");
 
-require("dotenv").config(); // MUST be first
+import dotenv from "dotenv";
+dotenv.config(); // MUST be first
 
-const express = require("express");
-const cors = require("cors");
-const connectDB = require("./config/db");
+import express from "express";
+import cors from "cors";
+import connectDB from "./config/db.js";
 
 const app = express();
 

@@ -78,4 +78,4 @@ async function processResume(file) {
   };
 }
 
-export default { processResume };
+export default processResume;

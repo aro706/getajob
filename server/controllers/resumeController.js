@@ -1,6 +1,6 @@
 import resumeService from "../services/resumeService.js";
 
-export const uploadResume = async (req, res) => {
+const uploadResume = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -18,3 +18,5 @@ export const uploadResume = async (req, res) => {
     res.status(500).json({ error: "Processing failed" });
   }
 };
+
+export default uploadResume
