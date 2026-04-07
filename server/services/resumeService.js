@@ -1,4 +1,4 @@
-import pdf from "pdf-parse";
+import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import embeddingService from "./embeddingService.js";
@@ -8,7 +8,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // ---------- EXTRACT TEXT ----------
 async function extractText(file) {
   if (file.mimetype === "application/pdf") {
-    const data = await pdf(file.buffer);
+    const data = await pdfParse(file.buffer);
     return data.text;
   }
 
@@ -62,7 +62,7 @@ ${text}
 }
 
 // ---------- MAIN ----------
-async function processResume(file) {
+async function resumeService(file) {
   const text = await extractText(file);
 
   const parsed = await parseResume(text);
@@ -71,11 +71,10 @@ async function processResume(file) {
     JSON.stringify(parsed)
   );
 
-  // You can store this in DB later
   return {
     parsed,
     embedding
   };
 }
 
-export default processResume;
+export default resumeService;
