@@ -1,5 +1,4 @@
-import processResume from "../services/resumeService.js";
-import { findTopMatchingRoles } from "../services/matchService.js";
+import resumeService from "../services/resumeService.js";
 
 const uploadResume = async (req, res) => {
   try {
@@ -7,27 +6,26 @@ const uploadResume = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    console.log("1. Extracting, generating embedding, and SAVING to database...");
-    // FIXED: Call the function directly!
-    const savedResume = await processResume(req.file);
+    console.log(
+      "1. Extracting, generating embedding, and SAVING to database...",
+    );
+
+    // 👇 This function parses the PDF, saves it, AND updates all 35 role ranklists in the background!
+    const savedResume = await resumeService.processResume(req.file);
 
     console.log(`-> Saved to DB with ID: ${savedResume._id}`);
 
-    console.log("2. Calculating match scores against database roles...");
-    const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
-
     res.json({
-      message: "Resume processed, saved to DB, and matched successfully!",
+      message:
+        "Resume processed, saved to DB, and all ranklists updated successfully!",
       data: {
         resumeId: savedResume._id,
         parsedResume: {
           skills: savedResume.skills,
-          experience: savedResume.experience
+          experience: savedResume.experience,
         },
-        topMatches: matchedRoles // Outputs best job titles!
-      }
+      },
     });
-
   } catch (err) {
     console.error("Resume Controller Error:", err);
     res.status(500).json({ error: "Processing failed" });

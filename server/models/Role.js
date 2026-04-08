@@ -1,20 +1,31 @@
 import mongoose from "mongoose";
 
 const roleSchema = new mongoose.Schema({
-  title: { 
-    type: String, 
-    required: true 
+  title: {
+    type: String,
+    required: true,
   },
-  description: { 
-    type: String, 
-    required: true 
+  description: {
+    type: String,
+    required: true,
   },
-  embedding: { 
-    type: [Number], // This stores the vector array of numbers from Gemini
-    required: true 
-  } 
+  embedding: {
+    type: [Number], // 768-dim array from Gemini
+    required: true,
+  },
+  // The pre-calculated ranklist bucket!
+  rankedResumes: [
+    {
+      resumeId: { type: mongoose.Schema.Types.ObjectId, ref: "Resume" },
+      score: { type: Number, required: true },
+    },
+  ],
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
-// Create and export the model using ES Modules
+// Create and export the model
 const Role = mongoose.model("Role", roleSchema);
 export default Role;
