@@ -2,7 +2,9 @@ import pdf from "pdf-parse/lib/pdf-parse.js"; // FIXED: The bypass trick!
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import generateEmbedding from "./embeddingService.js"; // FIXED import
-import Resume from "../models/Resume.js"; 
+import Resume from "../models/Resume.js";
+import Role from "../models/Role.js"; // NEW: For updating ranklists
+import { cosineSimilarity } from "../utils/similarity.js"; // NEW: For scoring against roles
 
 // ---------- EXTRACT TEXT ----------
 async function extractText(file) {
@@ -56,7 +58,10 @@ ${text}
   const result = await model.generateContent(prompt);
   let output = result.response.text();
 
-  output = output.replace(/```json/g, "").replace(/```/g, "").trim();
+  output = output
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
+    .trim();
 
   const match = output.match(/\{[\s\S]*\}/);
   if (match) output = match[0];
@@ -79,12 +84,32 @@ async function processResume(file) {
   const newResume = new Resume({
     skills: parsed.skills || [],
     experience: parsed.experience || [],
-    embedding: embedding
+    embedding: embedding,
   });
 
   const savedResume = await newResume.save();
 
-  return savedResume; 
+  // 5. UPDATE STANDARD ROLES RANKLISTS
+  // Fetch all standard roles we have in the DB
+  const standardRoles = await Role.find({});
+
+  for (const role of standardRoles) {
+    // Score this new resume against each standard role
+    const score = cosineSimilarity(embedding, role.embedding);
+
+    // Push the new resume to this role's ranklist
+    role.rankedResumes.push({
+      resumeId: savedResume._id,
+      score: score,
+    });
+
+    // Sort the ranklist so the highest scores are always at the top
+    role.rankedResumes.sort((a, b) => b.score - a.score);
+
+    await role.save();
+  }
+
+  return savedResume;
 }
 
 export default processResume; // Right

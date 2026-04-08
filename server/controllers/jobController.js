@@ -4,15 +4,22 @@ const postJob = async (req, res) => {
   try {
     const { title, description } = req.body;
 
-    if (!title || !description) {
+    if (
+      !title ||
+      typeof title !== "string" ||
+      title.trim() === "" ||
+      !description ||
+      typeof description !== "string" ||
+      description.trim() === ""
+    ) {
       return res
         .status(400)
-        .json({ error: "Title and description are required" });
+        .json({ error: "Valid title and description strings are required" });
     }
 
     const result = await jobService.postJobAndFindMatches({
-      title,
-      description,
+      title: title.trim(),
+      description: description.trim(),
     });
 
     res.status(201).json({
