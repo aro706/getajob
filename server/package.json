@@ -21,11 +21,7 @@
     "mongodb": "^7.1.1",
     "mongoose": "^9.4.1",
     "multer": "^2.1.1",
-<<<<<<< HEAD
     "pdf-parse": "^1.1.1"
-=======
-    "pdf-extraction": "^1.0.2"
->>>>>>> e5d63da (working on employer)
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

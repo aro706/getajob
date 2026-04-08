@@ -1,7 +1,7 @@
 import Role from '../models/Role.js';
 import { cosineSimilarity } from '../utils/similarity.js';
 
-export async function findTopMatchingRoles(resumeEmbedding, topK = 3) {
+export async function findTopMatchingRoles(resumeEmbedding, topK = 2) {
   try {
     // 1. Fetch all roles from the database
     const allRoles = await Role.find({});

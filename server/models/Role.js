@@ -10,7 +10,7 @@ const roleSchema = new mongoose.Schema({
     required: true 
   },
   embedding: { 
-    type: [Number], // This stores the vector array of numbers from Gemini
+    type: [Number],
     required: true 
   } 
 });

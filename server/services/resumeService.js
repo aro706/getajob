@@ -28,9 +28,10 @@ async function parseResume(text) {
   // FIXED: Initialize genAI inside the function!
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash"
-  });
+  // Around line 36
+const model = genAI.getGenerativeModel({
+  model: "gemini-3.1-flash-lite-preview" 
+});
 
   const prompt = `
 Extract structured data from resume.
@@ -86,4 +87,4 @@ async function processResume(file) {
   return savedResume; 
 }
 
-export default { processResume };
+export default processResume; // Right
