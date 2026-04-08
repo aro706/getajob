@@ -17,9 +17,6 @@ export function cosineSimilarity(vecA, vecB) {
     normB += vecB[i] * vecB[i];
   }
 
-  if (normA === 0 || normB === 0) {
-    return 0;
-  }
-
+  if (normA === 0 || normB === 0) return 0;
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }

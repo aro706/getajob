@@ -13,8 +13,9 @@ async function generateEmbedding(text) {
     
     return result.embedding.values;
 
+    return result.embedding.values;
   } catch (err) {
-    console.error("Embedding Error:", err);
+    console.error("Embedding Error:", err.message || err);
     throw new Error("Embedding failed");
   }
 }

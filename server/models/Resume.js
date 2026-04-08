@@ -5,28 +5,27 @@ const experienceSchema = new mongoose.Schema({
   company: String,
   role: String,
   duration: String,
-  description: String
+  description: String,
 });
 
 // Main Schema for the User's Resume
 const resumeSchema = new mongoose.Schema({
   skills: {
     type: [String],
-    default: []
+    default: [],
   },
   experience: {
     type: [experienceSchema],
-    default: []
+    default: [],
   },
-  embedding: { 
-    type: [Number], // The 768-number array from Gemini
-    required: true 
+  embedding: {
+    type: [Number], 
+    required: true,
   },
   createdAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-const Resume = mongoose.model("Resume", resumeSchema);
-export default Resume;
+export default mongoose.model("Resume", resumeSchema);

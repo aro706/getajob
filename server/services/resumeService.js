@@ -7,6 +7,7 @@ import Resume from "../models/Resume.js";
 // ---------- EXTRACT TEXT ----------
 async function extractText(file) {
   if (file.mimetype === "application/pdf") {
+    // pdf-extraction works perfectly as a normal function
     const data = await pdf(file.buffer);
     return data.text;
   }
@@ -85,4 +86,4 @@ async function processResume(file) {
   return savedResume; 
 }
 
-export default processResume;
+export default { processResume };
