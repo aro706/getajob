@@ -121,11 +121,7 @@ app.get("/", (req, res) => {
 app.get("/api/roles/rankings", async (req, res) => {
   try {
     const roles = await Role.find({})
-      .select("title rankedResumes") // Select only title and ranklist
-      .populate({
-        path: "rankedResumes.resumeId",
-        select: "skills experience", // Replaces ID with actual resume data
-      });
+      .select("title rankedResumes"); // Removed .populate() entirely
 
     res.status(200).json({
       success: true,
