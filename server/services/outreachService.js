@@ -1,20 +1,13 @@
 import { getHiringCompanies, searchBatch, extractHR, chunk } from "./discoveryService.js";
-import { findEmail } from "./enrichmentService.js";
+import { findEmail } from "./enrichmentService.js"; 
 
-// This function takes a single role string, runs the whole pipeline, and returns the contacts
 export async function runOutreachPipeline(roleTitle) {
   console.log(`\n--- STARTING DEEP SEARCH FOR: ${roleTitle} ---`);
   
   try {
-    // 1. Get Companies
     const companies = await getHiringCompanies(roleTitle);
-    if (!companies || companies.length === 0) {
-      console.log(`No companies found for ${roleTitle}`);
-      return [];
-    }
-    console.log(`Found ${companies.length} companies for ${roleTitle}`);
+    if (!companies || companies.length === 0) return [];
 
-    // 2. LinkedIn Search
     const groups = chunk(companies, 5);
     let allResults = [];
     for (const group of groups) {
@@ -22,22 +15,55 @@ export async function runOutreachPipeline(roleTitle) {
       allResults = allResults.concat(batchRes);
     }
 
-    // 3. Extract HRs
     const hrList = await extractHR(allResults);
     
-    // 4. Enrich Emails
+    // ---------------------------------------------------------
+    // SMART ENRICHMENT ALGORITHM (Strict Quality Control)
+    // ---------------------------------------------------------
     const finalContacts = [];
+    const hrByCompany = {};
+
+    // Group all found HRs by company
     for (const person of hrList) {
       if (person.name && person.company) {
+        if (!hrByCompany[person.company]) hrByCompany[person.company] = [];
+        hrByCompany[person.company].push(person);
+      }
+    }
+
+    for (const companyName in hrByCompany) {
+      const employees = hrByCompany[companyName];
+      let verifiedCount = 0;
+      let generatedContacts = [];
+
+      for (const person of employees) {
+        if (verifiedCount >= 2) break; // We have our 2 verified, stop wasting API calls!
+
         const emailData = await findEmail(person.name, person.company);
-        finalContacts.push({
+        console.log(`${person.name} (${person.company}) -> ${emailData.email} [${emailData.source}]`);
+        
+        const contactRecord = {
           name: person.name,
           role: person.role,
           company: person.company,
           linkedin: person.linkedin,
           email: emailData.email,
           source: emailData.source
-        });
+        };
+
+        if (emailData.source === 'hunter') {
+          finalContacts.push(contactRecord);
+          verifiedCount++;
+        } else {
+          generatedContacts.push(contactRecord);
+        }
+      }
+
+      // THE STRICT RULE:
+      // If we didn't find 2 verified Hunter emails, we can use a generated one to pad the list.
+      // BUT we only ever take ONE generated email maximum so we never have a "double generated" company.
+      if (verifiedCount < 2 && generatedContacts.length > 0) {
+        finalContacts.push(generatedContacts[0]);
       }
     }
 

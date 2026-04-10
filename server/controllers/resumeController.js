@@ -12,7 +12,8 @@ const uploadResume = async (req, res) => {
     console.log("1. Extracting, embedding, and saving resume...");
 
     // ✅ use new service (correct one)
-    const savedResume = await resumeService.processResume(req.file);
+    // ✅ RIGHT
+const savedResume = await resumeService(req.file);
 
     console.log("2. Finding top 3 matching roles...");
     const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
