@@ -1,57 +1,82 @@
 import axios from "axios";
 
-// ---------------- UTIL & FALLBACK ----------------
-function getDomain(company) {
-  if (!company) return "";
-  return company.toLowerCase().replace(/\s+/g, '') + ".com";
+// ---------------- DOMAIN LOOKUP (BEST VERSION) ----------------
+async function getDomain(company) {
+  try {
+    const url = `https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(company)}`;
+    const res = await axios.get(url);
+
+    if (res.data && res.data.length > 0) {
+      console.log(`Found domain for ${company}: ${res.data[0].domain}`);
+      return res.data[0].domain;
+    }
+  } catch (error) {
+    console.error(`Clearbit lookup failed for ${company}`);
+  }
+
+  // Fallback
+  const cleanName = company.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return `${cleanName}.com`;
 }
 
+// ---------------- UTIL ----------------
 function clean(s) {
   if (!s) return "";
-  return s.replace(/[^a-z]/gi, '').toLowerCase();
+  return s.replace(/[^a-z]/gi, "").toLowerCase();
 }
 
+// ---------------- FALLBACK GENERATOR ----------------
 function fallback(name, domain) {
   const parts = name.split(" ").map(clean);
   const first = parts[0] || "";
   const last = parts[1] || "";
+
   return {
-    email: last ? `${first}.${last}@${domain}` : `${first}@${domain}`,
-    source: "generated"
+    email: last
+      ? `${first}.${last}@${domain}`
+      : `${first}@${domain}`,
+    source: "generated (unverified)"
   };
 }
 
-// ---------------- 1. HUNTER (Primary Engine) ----------------
-async function tryHunter(name, company) {
+// ---------------- HUNTER (PRIMARY ENGINE) ----------------
+async function tryHunter(name, domain) {
   const HUNTER_API_KEY = process.env.HUNTER_API_KEY;
-  const domain = getDomain(company);
   if (!HUNTER_API_KEY) return null;
 
   try {
     const url = `https://api.hunter.io/v2/email-finder?domain=${domain}&full_name=${encodeURIComponent(name)}&api_key=${HUNTER_API_KEY}`;
-    // 4-second timeout so your pipeline never hangs
-    const res = await axios.get(url, { timeout: 4000 }); 
+
+    const res = await axios.get(url, { timeout: 4000 });
     const data = res.data.data;
 
-    // Hunter scores confidence out of 100. We only accept 70+
     if (data && data.email && data.score >= 70) {
-      return { email: data.email, source: "hunter" };
+      return {
+        email: data.email,
+        source: "hunter",
+        confidence: data.score
+      };
     }
+
     return null;
   } catch (error) {
-    return null; // Silent fail, move to generator
+    return null;
   }
 }
 
-// ---------------- WATERFALL ORCHESTRATOR ----------------
+// ---------------- MAIN ORCHESTRATOR ----------------
 export async function findEmail(name, company) {
-  if (!name || !company) return { email: "Unknown", source: "none" };
+  if (!name || !company) {
+    return { email: "Unknown", source: "none" };
+  }
 
-  // STEP 1: Hunter
-  const hunterResult = await tryHunter(name, company);
+  // STEP 1: Get domain (async)
+  const domain = await getDomain(company);
+
+  // STEP 2: Try Hunter
+  const hunterResult = await tryHunter(name, domain);
   if (hunterResult) return hunterResult;
 
-  // STEP 2: Generator (Fallback)
-  const domain = getDomain(company);
+  // STEP 3: Fallback generator
   return fallback(name, domain);
 }

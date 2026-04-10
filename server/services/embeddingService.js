@@ -1,22 +1,35 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import dotenv from "dotenv";
+dotenv.config();
 
 async function generateEmbedding(text) {
   try {
-    // 1. Initialize inside the function so dotenv is guaranteed to be loaded
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    
-    // 2. Use the correct, active 2026 model
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-    
-    // 3. Generate the vector
-    const result = await model.embedContent(text);
-    
-    return result.embedding.values;
+    if (!text || text.trim() === "") {
+      throw new Error("Empty text for embedding");
+    }
 
-    return result.embedding.values;
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-embedding-2-preview", // ✅ FIXED MODEL NAME
+    });
+
+    const result = await model.embedContent({
+      content: {
+        parts: [{ text }],
+      },
+    });
+
+    const embedding = result.embedding.values;
+
+    if (!embedding || embedding.length === 0) {
+      throw new Error("Embedding generation returned empty values");
+    }
+
+    return embedding;
   } catch (err) {
-    console.error("Embedding Error:", err.message || err);
-    throw new Error("Embedding failed");
+    console.error("❌ Embedding Error:", err.message);
+    throw new Error("Failed to generate vector");
   }
 }
 
