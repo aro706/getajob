@@ -1,8 +1,22 @@
 import axios from "axios";
 
-// ---------------- UTIL ----------------
-function getDomain(company) {
-  // Removes spaces, dots, and common suffixes to guess the domain
+// ---------------- NEW: DYNAMIC DOMAIN LOOKUP ----------------
+async function getDomain(company) {
+  try {
+    // Search for the real company domain using a free API
+    const url = `https://autocomplete.clearbit.com/v1/companies/suggest?query=${encodeURIComponent(company)}`;
+    const res = await axios.get(url);
+    
+    // If a match is found, return the actual domain (e.g., startup.ai)
+    if (res.data && res.data.length > 0) {
+      console.log(`Found domain for ${company}: ${res.data[0].domain}`); // <-- Add this
+      return res.data[0].domain; 
+    }
+  } catch (error) {
+    console.error(`Clearbit lookup failed for ${company}`);
+  }
+
+  // Fallback if API fails
   let cleanName = company.toLowerCase().replace(/[^a-z0-9]/g, '');
   return `${cleanName}.com`;
 }
@@ -19,13 +33,14 @@ function fallback(name, domain) {
 
   return {
     email: last ? `${first}.${last}@${domain}` : `${first}@${domain}`,
-    source: "generated"
+    source: "generated (unverified)"
   };
 }
 
 // ---------------- HUNTER ----------------
 export async function findEmail(name, company) {
-  const domain = getDomain(company);
+  // Use the new async domain finder
+  const domain = await getDomain(company); 
   const HUNTER_API_KEY = process.env.HUNTER_API_KEY;
 
   if (!HUNTER_API_KEY) {

@@ -10,20 +10,38 @@ export function chunk(arr, size) {
 }
 
 // ---------------- 1. JOB SEARCH (INDIA STRICT) ----------------
+// export async function getHiringCompanies(role) {
+//   console.log(`Fetching targeted hiring companies in India for: ${role}...`);
+//   const SERPAPI_KEY = process.env.SERPAPI_KEY;
+
+//   // Added "startup OR company" and strict India keywords
+//   const query = `"${role}" hiring India (startup OR company) OR "we are hiring" "${role}" India`;
+  
+//   // IMPROVEMENT: Added &gl=in to force SerpAPI to search from the Indian region
+//   const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&api_key=${SERPAPI_KEY}`;
+
+//   const res = await fetch(url);
+//   const data = await res.json();
+
+//   const results = (data.organic_results || []).slice(0, 15);
+//   return await extractCompanies(results);
+// }
+// ---------------- 1. JOB SEARCH (INDIA STRICT) ----------------
 export async function getHiringCompanies(role) {
   console.log(`Fetching targeted hiring companies in India for: ${role}...`);
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
 
-  // Added "startup OR company" and strict India keywords
-  const query = `"${role}" hiring India (startup OR company) OR "we are hiring" "${role}" India`;
+  // FIX 1: Added negative keywords (-naukri, -indeed, etc.) to block job portals from eating up the search results
+  const query = `"${role}" hiring India (startup OR company) OR "we are hiring" "${role}" India -naukri -indeed -glassdoor -linkedin -foundit -ambitionbox -hirist`;
   
-  // IMPROVEMENT: Added &gl=in to force SerpAPI to search from the Indian region
-  const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&api_key=${SERPAPI_KEY}`;
+  // FIX 2: Added &num=30 to the URL to fetch 30 results instead of the default 10
+  const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&num=30&api_key=${SERPAPI_KEY}`;
 
   const res = await fetch(url);
   const data = await res.json();
 
-  const results = (data.organic_results || []).slice(0, 15);
+  // Give Gemini a bigger slice (30 instead of 15)
+  const results = (data.organic_results || []).slice(0, 30);
   return await extractCompanies(results);
 }
 
@@ -60,16 +78,17 @@ ${JSON.stringify(results)}
 }
 
 // ---------------- 3. HR SEARCH ----------------
+// ---------------- 3. HR SEARCH ----------------
 export async function searchBatch(companies) {
   if (!companies || companies.length === 0) return [];
 
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
   const companyQuery = companies.map(c => `"${c}"`).join(" OR ");
   
-  // LinkedIn X-Ray strictly targeting Indian profiles
-  const query = `site:linkedin.com/in (${companyQuery}) ("recruiter" OR "HR" OR "talent acquisition" OR "founder") "India"`;
+  // FIX: Added 'intitle:' to force Google to look at the person's actual job title, and removed 'founder'
+  const query = `site:linkedin.com/in (${companyQuery}) (intitle:"HR" OR intitle:"Recruiter" OR intitle:"Talent" OR intitle:"People") "India"`;
   
-  console.log("HR Query:", query);
+  console.log("Strict HR Query:", query);
 
   const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&api_key=${SERPAPI_KEY}`;
 
@@ -92,19 +111,21 @@ export async function extractHR(results) {
 const model = genAI.getGenerativeModel({ 
   model: "gemini-3.1-flash-lite-preview"
 });
-  const prompt = `
-Extract HR personnel, recruiters, or founders from the provided search results.
+ const prompt = `
+You are a strict data parser. Extract ONLY dedicated HR professionals from the search results.
 
 STRICT RULES:
 - The person MUST be based in INDIA.
-- The person MUST currently hold an HR, Recruiter, Talent Acquisition, or Founder/Co-founder role.
-- Extract their full name, exact role, company name, and LinkedIn profile URL.
+- The person MUST hold a dedicated HR role (e.g., "HR Manager", "Technical Recruiter", "Talent Acquisition", "Head of People").
+- EXCLUDE Founders, CEOs, Directors, Software Engineers, Developers, and Consultants. 
+- If their title implies they build software (even for an HR company), EXCLUDE THEM.
+- Extract their full name, exact HR role, company name, and LinkedIn profile URL.
 - Return ONLY a valid JSON array of objects. Do not include markdown formatting.
-- If no valid people are found, return [].
+- If no valid HR people are found, return [].
 
 Return Format:
 [
- {"name":"John Doe", "role":"HR Manager", "company":"TechCorp", "linkedin":"https://linkedin.com/in/johndoe"}
+ {"name":"John Doe", "role":"Technical Recruiter", "company":"TechCorp", "linkedin":"https://linkedin.com/in/johndoe"}
 ]
 
 Data:
