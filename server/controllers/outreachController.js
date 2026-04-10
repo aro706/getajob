@@ -2,6 +2,7 @@ import Resume from "../models/Resume.js";
 import { generateEmailDrafts } from "../services/emailAgentService.js";
 import { sendMail } from "../services/mailTransporter.js"; 
 import { runOutreachPipeline } from "../services/outreachService.js";
+import { findEmail } from "../services/enrichmentService.js";
 
 // Existing Function: Finds the jobs and HR contacts
 export const discoverJobsAndHR = async (req, res) => {
@@ -78,5 +79,26 @@ export const sendEmail = async (req, res) => {
 
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+};
+
+export const searchHRContact = async (req, res) => {
+  try {
+    const { hrName, companyName } = req.body;
+
+    if (!hrName || !companyName) {
+      return res.status(400).json({ error: "Missing hrName or companyName" });
+    }
+
+    // This calls the service we updated with the MongoDB cache check
+    const result = await findEmail(hrName, companyName);
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error("Search HR Error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 };
