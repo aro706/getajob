@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-dune-dark: #1C150B;
+  --color-dune-stone: #3A3228;
+  --color-dune-sand: #DBD5B5;
+  --color-dune-tan: #C0B18B;
+  --color-dune-spice: #E86100;
+  --color-dune-blue: #1A75BB;
+  --color-dune-sky: #6687A1;
+
+  /* Typography */
+  --font-cinzel: 'Cinzel', serif;
+  --font-montserrat: 'Montserrat', sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-dune-dark text-dune-sand font-montserrat antialiased;
+  }
+}
