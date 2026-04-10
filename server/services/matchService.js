@@ -1,36 +1,32 @@
-import Role from '../models/Role.js';
-import { cosineSimilarity } from '../utils/similarity.js';
+import qdrantClient from '../config/qdrant.js';
 
-export async function findTopMatchingRoles(resumeEmbedding, topK = 2) {
+export async function findTopMatchingRoles(resumeEmbedding, topK = 3) {
   try {
-    // 1. Fetch all roles from the database
-    const allRoles = await Role.find({});
+    // Query Qdrant's 'roles' collection
+    const searchResults = await qdrantClient.search("roles", {
+      vector: Array.from(resumeEmbedding),
+      limit: topK,
+      with_payload: true // Brings back the title and description
+    });
 
-    if (!allRoles || allRoles.length === 0) {
-      throw new Error("No roles found in the database. Did you run seedRoles.js?");
+    if (!searchResults || searchResults.length === 0) {
+      throw new Error("No matches found in Qdrant. Did you run seedRoles.js?");
     }
 
-    // 2. Compare the resume vector against every role vector
-    const matchedRoles = allRoles.map((role) => {
-      const score = cosineSimilarity(resumeEmbedding, role.embedding);
-      
+    const matchedRoles = searchResults.map((match) => {
       return {
-        id: role._id,
-        title: role.title,
-        description: role.description,
-        // Convert the decimal score to a percentage for easier reading!
-        matchPercentage: (score * 100).toFixed(2) + "%" 
+        id: match.payload.mongoId, // Extract original Mongo ID
+        title: match.payload.title,
+        description: match.payload.description,
+        // Qdrant returns score as a float, like 0.854
+        matchPercentage: (match.score * 100).toFixed(2) + "%"
       };
     });
 
-    // 3. Sort from highest match to lowest match
-    matchedRoles.sort((a, b) => parseFloat(b.matchPercentage) - parseFloat(a.matchPercentage));
-
-    // 4. Return only the top matches
-    return matchedRoles.slice(0, topK);
+    return matchedRoles;
 
   } catch (error) {
-    console.error("Match Service Error:", error);
+    console.error("Match Service Error (Qdrant):", error);
     throw error;
   }
 }
