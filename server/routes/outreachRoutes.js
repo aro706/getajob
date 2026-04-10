@@ -1,10 +1,13 @@
 import express from "express";
-import { discoverJobsAndHR } from "../controllers/outreachController.js";
+import { discoverJobsAndHR, generateDraft, sendEmail } from "../controllers/outreachController.js";
 
 const router = express.Router();
 
-// This creates the POST route. 
-// When mounted in server.js, the full URL will likely be: http://localhost:5000/api/outreach/discover
+// Existing route
 router.post("/discover", discoverJobsAndHR);
+
+// New AI Drafting and Sending routes
+router.post("/generate-draft", generateDraft);
+router.post("/send", sendEmail);
 
 export default router;
