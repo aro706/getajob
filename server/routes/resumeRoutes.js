@@ -3,20 +3,22 @@ import multer from 'multer';
 import { 
   uploadResume, 
   triggerPipeline, 
-  updateResumeDetails 
+  updateResumeDetails,
+  matchRolesForResume,
+  discoverCompaniesForRole,
+  processManualOutreach
 } from '../controllers/resumeController.js';
 
 const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
-// Button 1: Upload & Parse PDF (FormData)
 router.post('/upload', upload.single('resume'), uploadResume);
-
-// Button 1.5 (Optional): User edits details on frontend and saves (JSON)
 router.put('/update', updateResumeDetails);
-
-// Button 2: Start the Match & Email Pipeline (JSON)
 router.post('/trigger-pipeline', triggerPipeline);
+
+router.post('/match-roles', matchRolesForResume);
+router.post('/discover-companies', discoverCompaniesForRole);
+router.post('/process-manual-outreach', processManualOutreach);
 
 export default router;

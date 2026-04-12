@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ---------------- UTIL: CHUNK ARRAY ----------------
 export function chunk(arr, size) {
   const res = [];
   for (let i = 0; i < arr.length; i += size) {
@@ -9,44 +8,23 @@ export function chunk(arr, size) {
   return res;
 }
 
-// ---------------- 1. JOB SEARCH (INDIA STRICT) ----------------
-// export async function getHiringCompanies(role) {
-//   console.log(`Fetching targeted hiring companies in India for: ${role}...`);
-//   const SERPAPI_KEY = process.env.SERPAPI_KEY;
-
-//   // Added "startup OR company" and strict India keywords
-//   const query = `"${role}" hiring India (startup OR company) OR "we are hiring" "${role}" India`;
-  
-//   // IMPROVEMENT: Added &gl=in to force SerpAPI to search from the Indian region
-//   const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&api_key=${SERPAPI_KEY}`;
-
-//   const res = await fetch(url);
-//   const data = await res.json();
-
-//   const results = (data.organic_results || []).slice(0, 15);
-//   return await extractCompanies(results);
-// }
-// ---------------- 1. JOB SEARCH (INDIA STRICT) ----------------
-export async function getHiringCompanies(role) {
-  console.log(`Fetching targeted hiring companies in India for: ${role}...`);
+export async function fetchRawCompanies(role) {
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
-
-  // FIX 1: Added negative keywords (-naukri, -indeed, etc.) to block job portals from eating up the search results
-  const query = `"${role}" hiring India (startup OR company) OR "we are hiring" "${role}" India -naukri -indeed -glassdoor -linkedin -foundit -ambitionbox -hirist`;
   
-  // FIX 2: Added &num=30 to the URL to fetch 30 results instead of the default 10
-  const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&num=30&api_key=${SERPAPI_KEY}`;
+  // Relaxed the strict negative keywords to get volume back. 
+  // We only block the main domains of job portals now, not the raw words.
+  // Increased num=50 to fetch maximum organic results in one API call.
+  const query = `"${role}" hiring India (startup OR tech) OR "we are hiring" "${role}" India -site:naukri.com -site:indeed.com -site:glassdoor.co.in`;
+  
+  const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&num=50&api_key=${SERPAPI_KEY}`;
 
   const res = await fetch(url);
   const data = await res.json();
 
-  // Give Gemini a bigger slice (30 instead of 15)
-  const results = (data.organic_results || []).slice(0, 30);
-  return await extractCompanies(results);
+  return (data.organic_results || []).slice(0, 50);
 }
 
-// ---------------- 2. GEMINI COMPANY FILTER ----------------
-async function extractCompanies(results) {
+export async function filterCompaniesWithGemini(results) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
 
@@ -59,7 +37,7 @@ STRICT RULES:
 - Prefer startups, mid-size companies, and product-based companies.
 - EXCLUDE massive big tech companies (Google, Amazon, Microsoft, Meta, Apple).
 - EXCLUDE training institutes, consultancies, job portals, and staffing agencies.
-- Return ONLY a valid JSON array of strings. Do not include markdown formatting like \`\`\`json.
+- Return ONLY a valid JSON array of strings. Do not include markdown formatting.
 - If no matching companies are found, return [].
 
 Data:
@@ -69,7 +47,6 @@ ${JSON.stringify(results)}
   const res = await model.generateContent(prompt);
   let text = res.response.text();
 
-  // Clean JSON output safely
   text = text.replace(/```json/g, '').replace(/```/g, '').trim();
   const match = text.match(/\[.*\]/s);
   if (match) text = match[0];
@@ -77,18 +54,17 @@ ${JSON.stringify(results)}
   return JSON.parse(text || "[]");
 }
 
-// ---------------- 3. HR SEARCH ----------------
-// ---------------- 3. HR SEARCH ----------------
+export async function getHiringCompanies(role) {
+  const results = await fetchRawCompanies(role);
+  return await filterCompaniesWithGemini(results);
+}
+
 export async function searchBatch(companies) {
   if (!companies || companies.length === 0) return [];
 
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
   const companyQuery = companies.map(c => `"${c}"`).join(" OR ");
-  
-  // FIX: Added 'intitle:' to force Google to look at the person's actual job title, and removed 'founder'
   const query = `site:linkedin.com/in (${companyQuery}) (intitle:"HR" OR intitle:"Recruiter" OR intitle:"Talent" OR intitle:"People") "India"`;
-  
-  console.log("Strict HR Query:", query);
 
   const url = `https://serpapi.com/search.json?engine=google&q=${encodeURIComponent(query)}&gl=in&api_key=${SERPAPI_KEY}`;
 
@@ -102,23 +78,21 @@ export async function searchBatch(companies) {
   }));
 }
 
-// ---------------- 4. GEMINI HR FILTER ----------------
 export async function extractHR(results) {
   if (!results || results.length === 0) return [];
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  // Inside both functions
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-3.1-flash-lite-preview"
-});
- const prompt = `
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-3.1-flash-lite-preview"
+  });
+  
+  const prompt = `
 You are a strict data parser. Extract ONLY dedicated HR professionals from the search results.
 
 STRICT RULES:
 - The person MUST be based in INDIA.
-- The person MUST hold a dedicated HR role (e.g., "HR Manager", "Technical Recruiter", "Talent Acquisition", "Head of People").
+- The person MUST hold a dedicated HR role.
 - EXCLUDE Founders, CEOs, Directors, Software Engineers, Developers, and Consultants. 
-- If their title implies they build software (even for an HR company), EXCLUDE THEM.
 - Extract their full name, exact HR role, company name, and LinkedIn profile URL.
 - Return ONLY a valid JSON array of objects. Do not include markdown formatting.
 - If no valid HR people are found, return [].

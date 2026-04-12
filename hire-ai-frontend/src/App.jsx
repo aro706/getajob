@@ -4,7 +4,7 @@ import ProtectedRoute from './routes/ProtectedRoute';
 
 import Login from './pages/auth/Login';
 import AspirantDashboard from './pages/aspirant/Dashboard';
-import ResultsDashboard from './pages/aspirant/ResultsDashboard'; // <-- 1. IMPORT ADDED
+import ResultsDashboard from './pages/aspirant/ResultsDashboard';
 import RecruiterDashboard from './pages/recruiter/Dashboard';
 
 function App() {
@@ -12,22 +12,19 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public Route */}
           <Route path="/login" element={<Login />} />
 
-          {/* Protected Aspirant Routes */}
           <Route element={<ProtectedRoute allowedRoles={['aspirant']} />}>
             <Route path="/aspirant/dashboard" element={<AspirantDashboard />} />
-            {/* 2. ROUTE ADDED HERE 👇 */}
             <Route path="/aspirant/results" element={<ResultsDashboard />} /> 
           </Route>
 
-          {/* Protected Recruiter Routes */}
           <Route element={<ProtectedRoute allowedRoles={['recruiter']} />}>
             <Route path="/recruiter/dashboard" element={<RecruiterDashboard />} />
           </Route>
 
-          {/* Default Fallback */}
+          {/* Fallback correctly kicks unauthenticated traffic back to login */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
