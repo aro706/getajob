@@ -82,10 +82,11 @@ export async function extractHR(results) {
   if (!results || results.length === 0) return [];
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
   const model = genAI.getGenerativeModel({ 
     model: "gemini-3-flash-preview"
   });
-  
+
   const prompt = `
 You are a strict data parser. Extract ONLY dedicated HR professionals from the search results.
 

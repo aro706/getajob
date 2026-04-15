@@ -101,15 +101,21 @@ export const updateResumeDetails = async (req, res) => {
     const { resumeId, skills, experience, projects } = req.body;
     if (!resumeId) return res.status(400).json({ error: "Resume ID is required." });
 
-    const updatedData = { skills: skills || [], experience: experience || [], projects: projects || [] };
+    const updatedData = { 
+      skills: skills || [], 
+      experience: experience || [], 
+      projects: projects || [] 
+    };
     
-    // Convert JSON into a clean English summary for better matching
+    // ✅ Convert structured data → semantic natural language (BETTER embeddings)
     const skillString = updatedData.skills.join(", ");
-    const expString = updatedData.experience.map(exp => `${exp.role || 'Professional'} at ${exp.company || 'Company'}`).join(". ");
+    const expString = updatedData.experience
+      .map(exp => `${exp.role || 'Professional'} at ${exp.company || 'Company'}`)
+      .join(". ");
     
     const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
     
-    // 🚀 THE FINAL FIX: Added the "query" parameter so Gemini knows this is for searching the database
+    // ✅ Use query mode for better search alignment
     const newEmbedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
     const updatedResume = await Resume.findByIdAndUpdate(
@@ -120,10 +126,35 @@ export const updateResumeDetails = async (req, res) => {
         projects: updatedData.projects,
         embedding: newEmbedding
       },
-      { new: true } 
+      { new: true }
     );
 
-    res.status(200).json({ data: updatedResume });
+    if (!updatedResume) {
+      return res.status(404).json({ error: "Resume not found in database." });
+    }
+
+    // ✅ RAG sync (correct way)
+    console.log("🔄 Rebuilding RAG chunks for updated resume...");
+
+    await qdrantClient.delete("resume_chunks", {
+      wait: true,
+      filter: {
+        must: [
+          { key: "resumeId", match: { value: String(resumeId) } }
+        ]
+      }
+    });
+
+    const fullText = JSON.stringify(updatedData); // better if you store original resume text
+    await processResumeRAG(resumeId, fullText);
+
+    console.log("✅ Resume successfully updated in MongoDB + Qdrant!");
+
+    res.status(200).json({
+      message: "Resume details and embeddings updated successfully!",
+      data: updatedResume
+    });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to update resume details." });
