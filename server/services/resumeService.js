@@ -3,7 +3,6 @@ import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Resume from "../models/Resume.js";
 
-import qdrantClient from "../config/qdrant.js";
 import { v4 as uuidv4 } from "uuid";
 import generateEmbedding, { chunkText } from "./embeddingService.js";
 
