@@ -1,124 +1,108 @@
-import { useState, useRef, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileText, Cpu, ChevronRight, Activity } from 'lucide-react';
-import CommandPalette from '../../components/CommandPalette';
+import { UploadCloud, CheckCircle2, ChevronRight, FileText, Building2 } from 'lucide-react';
 
 const AspirantDashboard = () => {
-  const { logout } = useAuth();
   const navigate = useNavigate();
+  const inputRef = useRef(null);
   
+  // ADDED: The Mode Toggle State
   const [mode, setMode] = useState('auto');
   const [step, setStep] = useState(1);
-  const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const [resumeId, setResumeId] = useState(null);
+  const [extractedSkills, setExtractedSkills] = useState([]);
   const [matchedRoles, setMatchedRoles] = useState([]);
+  
   const [selectedRole, setSelectedRole] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [selectedCompanies, setSelectedCompanies] = useState([]);
-  
-  const [status, setStatus] = useState('idle');
-  const [logs, setLogs] = useState([]);
-  const [extractedInsights, setExtractedInsights] = useState(null);
-  const inputRef = useRef(null);
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") setDragActive(true);
-    else if (e.type === "dragleave") setDragActive(false);
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const initiateAutomatedPipeline = async () => {
+  // ------------------------------------------------------------------
+  // FLOW 1: MANUAL OVERRIDE (Step-by-Step)
+  // ------------------------------------------------------------------
+  const handleManualUpload = async () => {
     if (!file) return;
-    setStatus('processing');
-    setLogs(["[SYSTEM] Initializing AI Copilot...", "Generating structural vector embeddings..."]);
-
+    setIsProcessing(true);
+    
     const formData = new FormData();
     formData.append("resume", file);
-
+    
     try {
-      const uploadRes = await axios.post('http://localhost:5000/api/resumes/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
-      setExtractedInsights(uploadRes.data.data.parsedResume);
-      setLogs(prev => [...prev, "Extracting dominant traits..."]);
-      
-      setTimeout(async () => {
-        setLogs(prev => [...prev, "Cross-referencing Qdrant matrix..."]);
-        const pipelineRes = await axios.post('http://localhost:5000/api/resumes/trigger-pipeline', {
-          resumeId: uploadRes.data.data.resumeId
-        });
-
-        setStatus('complete');
-        setTimeout(() => {
-          navigate('/aspirant/results', { state: { pipelineData: pipelineRes.data.data } });
-        }, 1500);
-      }, 2000);
-    } catch (error) {
-      setLogs(prev => [...prev, "⚠️ [FATAL] Pipeline execution halted."]);
-      setStatus('idle');
-    }
-  };
-
-  const processManualUpload = async () => {
-    if (!file) return;
-    setStatus('processing');
-    setLogs(["Mapping neural embeddings...", "Quantizing resume text..."]);
-    const formData = new FormData();
-    formData.append("resume", file);
-    try {
-      const res = await axios.post('http://localhost:5000/api/resumes/upload', formData, { 
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-      
+      const res = await axios.post('http://localhost:5000/api/resumes/upload', formData);
       const rId = res.data.data.resumeId;
       setResumeId(rId);
-      setExtractedInsights(res.data.data.parsedResume);
+      setExtractedSkills(res.data.data.parsedResume.skills || []);
       
-      setLogs(prev => [...prev, "Calculating cosine similarities for optimal roles..."]);
       const roleRes = await axios.post('http://localhost:5000/api/resumes/match-roles', { resumeId: rId });
-      
       setMatchedRoles(roleRes.data.data);
-      setStatus('idle');
+      
       setStep(2);
-    } catch(e) {
-      setStatus('idle');
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Failed to process resume.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const selectRoleAndFetchCompanies = async (roleTitle) => {
+  // ------------------------------------------------------------------
+  // FLOW 2: AUTOPILOT (One-Click God Mode)
+  // ------------------------------------------------------------------
+  const handleAutomatedPipeline = async () => {
+    if (!file) return;
+    setIsProcessing(true);
+    
+    const formData = new FormData();
+    formData.append("resume", file);
+    
+    try {
+      // 1. Upload & Parse
+      const uploadRes = await axios.post('http://localhost:5000/api/resumes/upload', formData);
+      const rId = uploadRes.data.data.resumeId;
+      const parsedData = uploadRes.data.data.parsedResume;
+
+      // 2. Trigger the Heavy Outreach Pipeline
+      const pipelineRes = await axios.post('http://localhost:5000/api/resumes/trigger-pipeline', { resumeId: rId });
+
+      // 3. Combine the data and go directly to Results
+      const pipelineData = {
+        resumeId: rId,
+        parsedResume: parsedData,
+        outreachResults: pipelineRes.data.data.outreachResults
+      };
+
+      navigate('/aspirant/results', { state: { pipelineData } });
+    } catch (error) {
+      console.error("Automated pipeline failed", error);
+      alert("Pipeline execution failed. Please check backend logs.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // --- Step 2 Actions (Manual Flow) ---
+  const handleSelectRole = async (roleTitle) => {
     setSelectedRole(roleTitle);
-    setStatus('processing');
-    setLogs([`Deploying discovery agents for ${roleTitle}...`]);
+    setIsProcessing(true);
     try {
        const compRes = await axios.post('http://localhost:5000/api/resumes/discover-companies', { roleTitle });
        setCompanies(compRes.data.data);
-       setStatus('idle');
        setStep(3);
-    } catch (e) {
-       setStatus('idle');
+    } catch (error) {
+       console.error("Discovery failed", error);
+    } finally {
+       setIsProcessing(false);
     }
   };
 
-  const executeManualOutreach = async () => {
+  // --- Step 3 Actions (Manual Flow) ---
+  const handleStartOutreach = async () => {
     if(selectedCompanies.length === 0) return;
-    setStatus('processing');
-    setLogs(["Bypassing AI filters...", "Extracting HR decision-makers...", "Prompting LLM for contextual drafts..."]);
+    setIsProcessing(true);
     try {
       const outRes = await axios.post('http://localhost:5000/api/resumes/process-manual-outreach', {
          resumeId,
@@ -127,193 +111,195 @@ const AspirantDashboard = () => {
       });
       
       const matchedData = matchedRoles.find(r => r.title === selectedRole);
-      const matchPct = matchedData ? matchedData.matchPercentage : '100%';
-
+      
       const pipelineData = {
         resumeId,
-        parsedResume: extractedInsights,
         outreachResults: [{
            targetRole: selectedRole,
-           matchPercentage: matchPct,
+           matchPercentage: matchedData ? matchedData.matchPercentage : '100%',
            totalFound: outRes.data.data.hrContacts.length,
            hrContacts: outRes.data.data.hrContacts
         }]
       };
 
       navigate('/aspirant/results', { state: { pipelineData } });
-    } catch(e) {
-       setStatus('idle');
+    } catch (error) {
+      console.error("Outreach failed", error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-blue-950 text-blue-50 p-8 font-sans overflow-hidden relative">
-      <CommandPalette />
-      
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-sky-500/10 blur-[120px] pointer-events-none rounded-full -translate-y-1/2"></div>
-
-      <div className="max-w-5xl mx-auto relative z-10">
-        <header className="flex justify-between items-center mb-12 border-b border-blue-900 pb-6">
-          <div className="flex items-center gap-3">
-            <Cpu className="text-sky-400" size={28} />
-            <h1 className="text-2xl font-bold tracking-tight">AI Copilot</h1>
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
+      {/* Top Navbar */}
+      <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+        <h1 className="text-xl font-bold text-indigo-600 tracking-tight">HireAI</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-gray-500">Workspace</span>
+          <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+            US
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-xs font-mono text-blue-300 bg-blue-900 px-3 py-1 rounded-full border border-blue-800">CMD + K</span>
-            <button onClick={logout} className="text-blue-300 hover:text-blue-100 transition-colors text-sm font-medium">
-              Disconnect
-            </button>
-          </div>
-        </header>
+        </div>
+      </header>
 
-        <div className="flex justify-center mb-10">
-          <div className="bg-blue-900/50 backdrop-blur-md border border-blue-800 rounded-lg p-1 flex">
+      <main className="max-w-4xl mx-auto py-12 px-6">
+        
+        {/* ADDED: The Mode Toggle Switch */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-gray-200 p-1 rounded-lg inline-flex shadow-inner">
             <button 
-              onClick={() => { setMode('auto'); setStep(1); setStatus('idle'); }} 
-              className={`px-6 py-2 text-sm font-medium rounded-md transition-all ${mode === 'auto' ? 'bg-sky-500/20 text-sky-400 shadow-sm' : 'text-blue-300 hover:text-blue-100'}`}
+              onClick={() => { setMode('auto'); setStep(1); }} 
+              className={`px-6 py-2 text-sm font-medium rounded-md transition-all ${mode === 'auto' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Autopilot
             </button>
             <button 
-              onClick={() => { setMode('manual'); setStep(1); setStatus('idle'); }} 
-              className={`px-6 py-2 text-sm font-medium rounded-md transition-all ${mode === 'manual' ? 'bg-sky-500/20 text-sky-400 shadow-sm' : 'text-blue-300 hover:text-blue-100'}`}
+              onClick={() => { setMode('manual'); setStep(1); }} 
+              className={`px-6 py-2 text-sm font-medium rounded-md transition-all ${mode === 'manual' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Manual Override
             </button>
           </div>
         </div>
 
-        <AnimatePresence mode="wait">
-          {step === 1 && status === 'idle' && (
-            <motion.div key="step1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="flex flex-col items-center">
-              <div 
-                className={`w-full max-w-2xl p-16 border-2 border-dashed rounded-2xl text-center transition-all duration-300 bg-blue-900/30 backdrop-blur-sm ${dragActive ? 'border-sky-500 bg-sky-500/5' : 'border-blue-700 hover:border-blue-500'}`}
-                onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
+        {/* Step 1: Upload */}
+        {step === 1 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-10 text-center">
+            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <UploadCloud size={32} />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload your Resume</h2>
+            <p className="text-gray-500 mb-8 max-w-md mx-auto">
+              {mode === 'auto' 
+                ? "We'll completely automate your job search. Upload your resume and let AI find roles, source HR contacts, and draft emails instantly." 
+                : "We'll extract your skills and match you with open roles. You choose exactly which companies to target."}
+            </p>
+            
+            <input 
+              ref={inputRef} type="file" accept=".pdf" className="hidden" 
+              onChange={(e) => setFile(e.target.files[0])} 
+            />
+            
+            <div className="flex flex-col items-center gap-4">
+              <button 
+                onClick={() => inputRef.current.click()} 
+                className="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg hover:bg-gray-50 transition-colors font-medium text-sm"
               >
-                <input ref={inputRef} type="file" accept=".pdf" className="hidden" onChange={(e) => setFile(e.target.files[0])} />
-                
-                <UploadCloud className="mx-auto h-12 w-12 text-sky-400 mb-6" />
-                <h3 className="text-xl font-semibold mb-2">{file ? file.name : "Inject Resume Protocol"}</h3>
-                <p className="text-blue-300 mb-8 text-sm font-mono">Accepts strictly .pdf format.</p>
-                
-                <div className="flex justify-center gap-4">
-                  <button onClick={() => inputRef.current.click()} className="bg-blue-800 text-blue-50 border border-blue-700 px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                    Browse Files
-                  </button>
-                  {file && (
-                    <button onClick={mode === 'auto' ? initiateAutomatedPipeline : processManualUpload} className="bg-sky-600 text-white px-6 py-2.5 rounded-lg hover:bg-sky-500 transition-all font-medium shadow-[0_0_20px_rgba(14,165,233,0.3)]">
-                      {mode === 'auto' ? 'Engage Copilot' : 'Analyze Vectors'}
+                {file ? file.name : "Select PDF Document"}
+              </button>
+              
+              {file && (
+                <button 
+                  onClick={mode === 'auto' ? handleAutomatedPipeline : handleManualUpload} 
+                  disabled={isProcessing}
+                  className="bg-indigo-600 text-white px-8 py-2.5 rounded-lg hover:bg-indigo-700 transition-all font-medium text-sm disabled:opacity-50"
+                >
+                  {isProcessing ? "Processing (This may take a minute)..." : (mode === 'auto' ? "Engage Autopilot" : "Continue Manually")}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Role Matches (Only for Manual Mode) */}
+        {step === 2 && (
+          <div>
+            <div className="mb-6 flex justify-between items-end">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Recommended Roles</h2>
+                <p className="text-gray-500 text-sm mt-1">Select a role to discover actively hiring companies.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                 <span className="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full font-medium border border-indigo-100">
+                   {extractedSkills.length} Skills Extracted
+                 </span>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {matchedRoles.map((role, i) => (
+                <div key={i} className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow flex items-center justify-between group">
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-gray-50 rounded-lg text-gray-500 group-hover:text-indigo-600 transition-colors">
+                      <FileText size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900">{role.title}</h3>
+                      <p className="text-gray-500 text-sm mt-1 max-w-xl">{role.description}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-indigo-600">{role.matchPercentage}</p>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">Match Score</p>
+                    </div>
+                    <button 
+                      onClick={() => handleSelectRole(role.title)}
+                      disabled={isProcessing}
+                      className="text-gray-400 hover:text-indigo-600 p-2 transition-colors disabled:opacity-50"
+                    >
+                      <ChevronRight size={24} />
                     </button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          )}
+              ))}
+            </div>
+          </div>
+        )}
 
-          {step === 2 && status === 'idle' && (
-            <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-3xl mx-auto">
-              <div className="mb-8">
-                <h2 className="text-xl font-semibold text-blue-50 mb-2">Target Synchronization</h2>
-                <p className="text-blue-300 text-sm">Select the optimal dimensional fit based on your parsed vector weights.</p>
-              </div>
-              <div className="grid gap-4">
-                {matchedRoles.map((role, i) => (
-                  <button key={i} onClick={() => selectRoleAndFetchCompanies(role.title)} className="group flex items-center justify-between bg-blue-900/50 border border-blue-800 hover:border-sky-500/50 p-5 rounded-xl transition-all text-left">
-                     <div>
-                       <p className="font-semibold text-lg text-blue-50 group-hover:text-sky-300 transition-colors">{role.title}</p>
-                       <p className="text-blue-400 text-sm mt-1">{role.description.substring(0, 80)}...</p>
-                     </div>
-                     <div className="flex flex-col items-end">
-                       <span className="text-xl font-mono text-cyan-400">{role.matchPercentage}</span>
-                       <span className="text-[10px] uppercase tracking-wider text-blue-400">Compatibility</span>
-                     </div>
-                  </button>
-                ))}
-              </div>
-            </motion.div>
-          )}
+        {/* Step 3: Company Selection (Only for Manual Mode) */}
+        {step === 3 && (
+          <div>
+            <div className="mb-6">
+              <button onClick={() => setStep(2)} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium mb-4 inline-block">&larr; Back to roles</button>
+              <h2 className="text-2xl font-bold text-gray-900">Targeting: {selectedRole}</h2>
+              <p className="text-gray-500 text-sm mt-1">Select the companies you want our AI to draft outreach emails for.</p>
+            </div>
 
-          {step === 3 && status === 'idle' && (
-            <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-4xl mx-auto">
-              <div className="flex justify-between items-end mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-blue-50 mb-2">Verified Nodes for: <span className="text-sky-400">{selectedRole}</span></h2>
-                  <p className="text-blue-300 text-sm">Select the organizational structures to infiltrate.</p>
-                </div>
-                <span className="font-mono text-sm text-blue-400">{selectedCompanies.length} selected</span>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-8">
+              <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
                 {companies.map((c, i) => {
-                   const isSelected = selectedCompanies.includes(c.title);
-                   return (
-                     <div key={i} onClick={() => {
-                        if(isSelected) setSelectedCompanies(prev => prev.filter(x => x !== c.title));
-                        else setSelectedCompanies(prev => [...prev, c.title]);
-                     }} className={`cursor-pointer flex items-start gap-4 p-5 rounded-xl border transition-all ${isSelected ? 'bg-sky-500/10 border-sky-500/50 shadow-[0_0_15px_rgba(14,165,233,0.1)]' : 'bg-blue-900/50 border-blue-800 hover:border-blue-600'}`}>
-                        <div className={`mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-sky-500 border-sky-500' : 'border-blue-600'}`}>
-                          {isSelected && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-blue-50">{c.title}</p>
-                          <p className="text-xs text-blue-300 mt-2 leading-relaxed line-clamp-3">{c.snippet}</p>
-                        </div>
-                     </div>
-                   )
-                })}
-              </div>
-              <div className="flex justify-between mt-8 pt-6 border-t border-blue-800">
-                <button onClick={() => setStep(2)} className="text-blue-300 hover:text-blue-100 px-4 py-2 text-sm font-medium transition-colors">
-                   ← Back to Vectors
-                </button>
-                <button onClick={executeManualOutreach} disabled={selectedCompanies.length === 0} className="bg-sky-600 text-white px-8 py-2.5 rounded-lg hover:bg-sky-500 transition-all font-medium shadow-lg disabled:opacity-50 flex items-center gap-2">
-                   Compile Comms <ChevronRight size={16} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {status === 'processing' && (
-            <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col md:flex-row gap-8 max-w-5xl mx-auto w-full">
-              
-              <div className="flex-1 bg-blue-900/50 border border-blue-800 rounded-xl p-6 h-[400px] flex flex-col relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-sky-500 to-transparent animate-[shimmer_2s_infinite]"></div>
-                <div className="flex items-center gap-3 mb-6 border-b border-blue-800 pb-4">
-                  <Activity className="text-sky-400 animate-pulse" size={20} />
-                  <h3 className="font-mono text-sm tracking-widest text-blue-200 uppercase">Process Terminal</h3>
-                </div>
-                <div className="flex-1 font-mono text-sm text-blue-300 overflow-y-auto space-y-3 custom-scrollbar">
-                  {logs.map((log, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className={log.includes('WARNING') || log.includes('FATAL') ? 'text-rose-400' : 'text-blue-200'}>
-                      <span className="text-blue-400 mr-2">[{new Date().toISOString().split('T')[1].slice(0, 8)}]</span>
-                      {log}
-                    </motion.div>
-                  ))}
-                  <div className="w-2 h-4 bg-sky-400 animate-ping mt-2"></div>
-                </div>
-              </div>
-
-              {extractedInsights && (
-                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full md:w-80 space-y-4">
-                    <div className="bg-blue-900/80 backdrop-blur border border-blue-800 rounded-xl p-5">
-                      <h4 className="text-xs font-mono text-blue-400 uppercase tracking-widest mb-4">What the AI Sees</h4>
-                      <div className="space-y-3">
-                         <div>
-                            <p className="text-[10px] text-blue-400 uppercase mb-1">Top Skills</p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {extractedInsights.skills?.slice(0, 6).map((s, i) => (
-                                <span key={i} className="text-xs bg-blue-950 text-sky-300 px-2 py-0.5 rounded border border-blue-800">{s}</span>
-                              ))}
-                            </div>
-                         </div>
+                  const isSelected = selectedCompanies.includes(c.title);
+                  return (
+                    <div 
+                      key={i} 
+                      onClick={() => {
+                         if(isSelected) setSelectedCompanies(prev => prev.filter(x => x !== c.title));
+                         else setSelectedCompanies(prev => [...prev, c.title]);
+                      }} 
+                      className={`p-5 flex items-start gap-4 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? 'bg-indigo-50/30' : ''}`}
+                    >
+                      <div className={`mt-1 flex-shrink-0 w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300 bg-white'}`}>
+                        {isSelected && <CheckCircle2 size={14} className="text-white" />}
+                      </div>
+                      <div>
+                        <h4 className="text-md font-bold text-gray-900 flex items-center gap-2">
+                          <Building2 size={16} className="text-gray-400" />
+                          {c.title}
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-1">{c.snippet}</p>
                       </div>
                     </div>
-                 </motion.div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button 
+                onClick={handleStartOutreach} 
+                disabled={isProcessing || selectedCompanies.length === 0} 
+                className="bg-indigo-600 text-white px-8 py-3 rounded-lg hover:bg-indigo-700 transition-all font-medium disabled:opacity-50 flex items-center gap-2 shadow-sm"
+              >
+                {isProcessing ? "Drafting Emails..." : "Draft Outreach"}
+                {!isProcessing && <ChevronRight size={18} />}
+              </button>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 };

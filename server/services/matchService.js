@@ -1,32 +1,48 @@
-import qdrantClient from '../config/qdrant.js';
+import Role from '../models/Role.js';
 
-export async function findTopMatchingRoles(resumeEmbedding, topK = 3) {
+export async function findTopMatchingRoles(resumeEmbedding, limit = 5) {
   try {
-    // Query Qdrant's 'roles' collection
-    const searchResults = await qdrantClient.search("roles", {
-      vector: Array.from(resumeEmbedding),
-      limit: topK,
-      with_payload: true // Brings back the title and description
-    });
+    const matchedRoles = await Role.aggregate([
+      {
+        $vectorSearch: {
+          index: "vector_index", // The name of the index you created in the Atlas UI
+          path: "embedding",
+          queryVector: Array.from(resumeEmbedding),
+          numCandidates: 100, // How many documents to check
+          limit: limit
+        }
+      },
+      {
+        // Calculate the percentage score (MongoDB returns score directly in the pipeline)
+        $project: {
+          _id: 1,
+          title: 1,
+          description: 1,
+          score: { $meta: "vectorSearchScore" }
+        }
+      },
+      {
+        // Optional: Filter out bad matches (equivalent to score_threshold)
+        $match: {
+          score: { $gte: 0.55 } 
+        }
+      }
+    ]);
 
-    if (!searchResults || searchResults.length === 0) {
-      throw new Error("No matches found in Qdrant. Did you run seedRoles.js?");
+    if (!matchedRoles || matchedRoles.length === 0) {
+      console.log("⚠️ No roles met the minimum matching threshold.");
+      return [];
     }
 
-    const matchedRoles = searchResults.map((match) => {
-      return {
-        id: match.payload.mongoId, // Extract original Mongo ID
-        title: match.payload.title,
-        description: match.payload.description,
-        // Qdrant returns score as a float, like 0.854
-        matchPercentage: (match.score * 100).toFixed(2) + "%"
-      };
-    });
-
-    return matchedRoles;
+    return matchedRoles.map((match) => ({
+      id: match._id.toString(),
+      title: match.title,
+      description: match.description,
+      matchPercentage: (match.score * 100).toFixed(2) + "%"
+    }));
 
   } catch (error) {
-    console.error("Match Service Error (Qdrant):", error);
+    console.error("Match Service Error (MongoDB Vector):", error);
     throw error;
   }
 }

@@ -4,9 +4,7 @@ import { runOutreachPipeline, processSelectedCompanies } from "../services/outre
 import { generateEmailDrafts } from "../services/emailAgentService.js"; 
 import { sendMail } from "../services/mailTransporter.js"; 
 import Resume from "../models/Resume.js"; 
-import crypto from "crypto";
 import generateEmbedding from "../services/embeddingService.js";
-import qdrantClient from "../config/qdrant.js";
 import { fetchRawCompanies } from "../services/discoveryService.js";
 
 export const uploadResume = async (req, res) => {
@@ -15,7 +13,12 @@ export const uploadResume = async (req, res) => {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
+    console.log(`\n📄 Starting upload process for: ${req.file.originalname}`);
+    
+    // Process the resume
     const savedResume = await resumeService(req.file);
+
+    console.log(`✅ Resume processed successfully! ID: ${savedResume._id}`);
 
     res.status(200).json({
       data: {
@@ -28,7 +31,13 @@ export const uploadResume = async (req, res) => {
       }
     });
   } catch (err) {
-    res.status(500).json({ error: "Failed to parse and save resume" });
+    console.error("\n🔥 FATAL UPLOAD ERROR DETECTED:");
+    console.error(err);
+    
+    res.status(500).json({ 
+      error: "Failed to parse and save resume", 
+      details: err.message 
+    });
   }
 };
 
@@ -106,24 +115,10 @@ export const updateResumeDetails = async (req, res) => {
       { new: true } 
     );
 
-    await qdrantClient.delete("resumes", {
-      wait: true,
-      filter: { must: [{ key: "mongoId", match: { value: String(resumeId) } }] }
-    });
-
-    await qdrantClient.upsert("resumes", {
-      wait: true,
-      points: [
-        {
-          id: crypto.randomUUID(),
-          vector: newEmbedding,
-          payload: { mongoId: String(resumeId), skills: updatedData.skills.join(", ") }
-        }
-      ]
-    });
-
+    // 🛑 This is the section that was accidentally deleted!
     res.status(200).json({ data: updatedResume });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Failed to update resume details." });
   }
 };

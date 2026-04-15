@@ -1,10 +1,8 @@
 import pdf from "pdf-parse/lib/pdf-parse.js"; 
 import mammoth from "mammoth";
-import crypto from "crypto";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import generateEmbedding from "./embeddingService.js"; 
 import Resume from "../models/Resume.js";
-import qdrantClient from "../config/qdrant.js";
 
 async function extractText(file) {
   if (file.mimetype === "application/pdf") {
@@ -20,7 +18,9 @@ async function extractText(file) {
 
 async function parseResume(text) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-lite-preview" });
+  
+  // Using the stable flash model to prevent 503 demand spikes
+  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   const prompt = `Extract structured data from resume. Return ONLY JSON: {"skills": [], "experience": [{"company": "", "role": "", "duration": "", "description": ""}]} \n\nResume:\n${text}`;
 
@@ -32,22 +32,11 @@ async function parseResume(text) {
   return JSON.parse(output);
 }
 
-// Ensure the Resumes collection exists in Qdrant
-async function ensureResumesCollection() {
-  try {
-    const response = await qdrantClient.getCollections();
-    const exists = response.collections.some(c => c.name === "resumes");
-    if (!exists) {
-      await qdrantClient.createCollection("resumes", { vectors: { size: 3072, distance: "Cosine" } });
-    }
-  } catch (err) {
-    console.error("Collection check error:", err);
-  }
-}
-
 async function processResume(file) {
   const text = await extractText(file);
   const parsed = await parseResume(text);
+  
+  // Generate the 3072-dimension vector from Gemini
   const embedding = Array.from(await generateEmbedding(JSON.stringify(parsed)));
 
   const newResume = new Resume({
@@ -56,24 +45,8 @@ async function processResume(file) {
     embedding: embedding,
   });
 
+  // 🚀 Just save to MongoDB! Atlas Vector Search handles the indexing automatically.
   const savedResume = await newResume.save();
-
-  await ensureResumesCollection();
-
-  // UPSERT TO QDRANT
-  await qdrantClient.upsert("resumes", {
-    wait: true,
-    points: [
-      {
-        id: crypto.randomUUID(),
-        vector: embedding,
-        payload: {
-          mongoId: String(savedResume._id),
-          skills: (parsed.skills || []).join(", ")
-        }
-      }
-    ]
-  });
 
   return savedResume;
 }

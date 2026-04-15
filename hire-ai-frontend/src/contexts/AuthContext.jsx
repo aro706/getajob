@@ -1,39 +1,37 @@
-import { createContext, useState, useContext } from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
+import { createContext, useState, useEffect, useContext } from 'react';
 
-// 1. Keep the context private to this file (Do not export it)
-const AuthContext = createContext();
+// 1. Create the Context
+export const AuthContext = createContext();
 
-// 2. Export the hook directly from here (Vite allows Hooks + Components)
-export const useAuth = () => useContext(AuthContext);
+// 2. Export the custom hook so Login.jsx can use it!
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
 
-// 3. Export the Provider Component
+// 3. The Provider Component
 export const AuthProvider = ({ children }) => {
-  const { user: auth0User, isAuthenticated, isLoading, logout: auth0Logout, error } = useAuth0();
-  
-  const [role, setRole] = useState(() => localStorage.getItem('hire_ai_role'));
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const setAppRole = (selectedRole) => {
-    localStorage.setItem('hire_ai_role', selectedRole);
-    setRole(selectedRole);
-  };
+  useEffect(() => {
+    // TEMPORARY BYPASS: Automatically mock a logged-in session for UI work
+    const mockUser = {
+      id: "123",
+      name: "Test User",
+      role: "aspirant"
+    };
+    
+    // Comment out setUser(mockUser) later if you want to test the actual login screen!
+    setUser(mockUser); 
+    setLoading(false);
+  }, []);
 
-  const logout = () => {
-    localStorage.removeItem('hire_ai_role');
-    setRole(null);
-    auth0Logout({ logoutParams: { returnTo: `${window.location.origin}/login` } });
-  };
+  const login = (userData) => setUser(userData);
+  const logout = () => setUser(null);
 
   return (
-    <AuthContext.Provider value={{ 
-      user: isAuthenticated ? { ...auth0User, role } : null, 
-      isAuthenticated,
-      setAppRole, 
-      logout, 
-      loading: isLoading,
-      error 
-    }}>
-      {children}
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {!loading && children}
     </AuthContext.Provider>
   );
 };

@@ -1,33 +1,24 @@
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth'; // Adjust path if necessary
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-dune-dark text-dune-sand font-cinzel text-2xl animate-pulse">
-        Accessing Guild Records...
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
   }
 
-  // Not logged in? Send to login.
+  // If there's no user, kick them to login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // Logged in but wrong role? Send to an unauthorized message (or back to their dashboard).
-  if (!allowedRoles.includes(user.role)) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-dune-dark text-dune-spice font-montserrat">
-        <h1 className="text-4xl font-cinzel mb-4">Access Denied</h1>
-        <p>Your genetics do not permit access to this sector.</p>
-      </div>
-    );
+  // If roles are specified and user doesn't have the right one, kick them to login
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/login" replace />;
   }
 
-  // Authorized! Render the child routes.
+  // Allow them through
   return <Outlet />;
 };
 

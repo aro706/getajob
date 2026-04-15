@@ -1,46 +1,59 @@
 import generateEmbedding from "./embeddingService.js";
 import Resume from "../models/Resume.js";
-import qdrantClient from "../config/qdrant.js";
+import Role from "../models/Role.js";
 
 async function postJobAndFindMatches(jobData) {
   const jobEmbedding = Array.from(await generateEmbedding(jobData.description));
 
-  // 1. Find matched job categories from 'roles' collection
-  const roleResults = await qdrantClient.search("roles", {
-    vector: jobEmbedding,
-    limit: 3,
-    with_payload: true
-  });
-  const matchedJobCategories = roleResults.map(r => r.payload.title);
+  // 1. Find matched job categories from Roles collection
+  const matchedRoles = await Role.aggregate([
+    {
+      $vectorSearch: {
+        index: "vector_index",
+        path: "embedding",
+        queryVector: jobEmbedding,
+        numCandidates: 50,
+        limit: 3
+      }
+    }
+  ]);
+  const matchedJobCategories = matchedRoles.map(r => r.title);
 
-  // 2. Find top 10 best candidates directly from 'resumes' collection
-  const resumeResults = await qdrantClient.search("resumes", {
-    vector: jobEmbedding,
-    limit: 10,
-    with_payload: true
-  });
+  // 2. Find top 10 best candidates directly from Resumes collection
+  const topResumes = await Resume.aggregate([
+    {
+      $vectorSearch: {
+        index: "vector_index",
+        path: "embedding",
+        queryVector: jobEmbedding,
+        numCandidates: 100,
+        limit: 10
+      }
+    },
+    {
+      $project: {
+        _id: 1,
+        skills: 1,
+        experience: 1,
+        score: { $meta: "vectorSearchScore" }
+      }
+    }
+  ]);
 
-  if (!resumeResults || resumeResults.length === 0) {
+  if (!topResumes || topResumes.length === 0) {
     return { matchedJobCategories, topCandidates: [] };
   }
 
-  // 3. Fetch the actual resume details from MongoDB using the linked mongoId
-  const topResumes = await Promise.all(
-    resumeResults.map(async (match) => {
-      const resume = await Resume.findById(match.payload.mongoId);
-      if(!resume) return null;
-      return {
-        resumeId: resume._id,
-        skills: resume.skills,
-        experience: resume.experience,
-        matchScore: (match.score * 100).toFixed(2) + "%", 
-      };
-    })
-  );
+  const formattedCandidates = topResumes.map(resume => ({
+    resumeId: resume._id,
+    skills: resume.skills,
+    experience: resume.experience,
+    matchScore: (resume.score * 100).toFixed(2) + "%", 
+  }));
 
   return {
     matchedJobCategories,
-    topCandidates: topResumes.filter(r => r !== null), 
+    topCandidates: formattedCandidates, 
   };
 }
 

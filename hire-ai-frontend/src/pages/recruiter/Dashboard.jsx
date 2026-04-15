@@ -1,7 +1,9 @@
-import { useAuth } from '../../hooks/useAuth';
 
 const RecruiterDashboard = () => {
-  const { logout } = useAuth();
+    const logout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+    };
   return (
     <div className="p-8">
       <h1 className="text-3xl font-cinzel text-dune-spice mb-4">Recruiter Command</h1>

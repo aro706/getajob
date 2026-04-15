@@ -1,79 +1,120 @@
-import { useAuth } from '../../hooks/useAuth';
-import { useAuth0 } from '@auth0/auth0-react';
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Cpu, Users, Terminal } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext'; 
 
 const Login = () => {
-  const { setAppRole, isAuthenticated, user } = useAuth();
-  const { loginWithRedirect, isLoading } = useAuth0();
   const navigate = useNavigate();
+  const { login, user } = useAuth();
+  
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Automatically route the user once Auth0 returns them to the app
+  // If the mock user is already active from AuthContext, kick them straight to the dashboard
   useEffect(() => {
-    if (isAuthenticated && user?.role) {
-      navigate(`/${user.role}/dashboard`);
+    if (user) {
+      navigate('/aspirant/dashboard');
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [user, navigate]);
 
-  const handleLogin = async (role) => {
-    // 1. Save the role intention
-    setAppRole(role);
-    // 2. Fire Auth0's Universal Login
-    await loginWithRedirect({
-      appState: { targetUrl: `/${role}/dashboard` }
-    });
+  const handleLogin = (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    // Mock network request delay for realism
+    setTimeout(() => {
+      login({
+        id: "123",
+        name: "Test User",
+        role: "aspirant"
+      });
+      navigate('/aspirant/dashboard');
+    }, 800);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-blue-950 text-sky-400 font-mono text-sm tracking-widest uppercase">
-        Initializing Authentication Protocol...
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-blue-950 relative overflow-hidden font-sans">
-      
-      {/* Background AI Glow Effect */}
-      <div className="absolute top-0 left-0 w-full h-[500px] bg-sky-500/10 blur-[120px] pointer-events-none rounded-full -translate-y-1/2"></div>
-      
-      <div className="bg-blue-900/50 backdrop-blur-xl p-10 rounded-2xl border border-blue-800 shadow-2xl text-center relative z-10 max-w-lg w-full mx-4">
-        
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-blue-950 border border-blue-800 rounded-2xl flex items-center justify-center shadow-inner">
-            <Cpu className="text-sky-400 w-8 h-8" />
-          </div>
-        </div>
-        
-        <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">AI Copilot Access</h1>
-        <p className="text-blue-300 text-sm mb-10 font-mono">Select your operational domain.</p>
-        
-        <div className="flex flex-col gap-4">
-          <button 
-            onClick={() => handleLogin('aspirant')}
-            className="group flex items-center justify-between bg-blue-950/50 border border-blue-800 text-blue-100 px-6 py-4 rounded-xl font-medium hover:bg-sky-500/10 hover:border-sky-500/50 transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <Terminal className="text-blue-400 group-hover:text-sky-400 transition-colors" size={20} />
-              <span>Authenticate as Aspirant</span>
-            </div>
-            <span className="text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-          </button>
-          
-          <button 
-            onClick={() => handleLogin('recruiter')}
-            className="group flex items-center justify-between bg-blue-950/50 border border-blue-800 text-blue-100 px-6 py-4 rounded-xl font-medium hover:bg-sky-500/10 hover:border-sky-500/50 transition-all cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <Users className="text-blue-400 group-hover:text-sky-400 transition-colors" size={20} />
-              <span>Authenticate as Recruiter</span>
-            </div>
-            <span className="text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
-          </button>
-        </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col justify-center font-sans">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 tracking-tight">
+          Sign in to HireAI
+        </h2>
+        <p className="mt-2 text-center text-sm text-gray-600">
+          Or <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">start your 14-day free trial</a>
+        </p>
+      </div>
 
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div className="bg-white py-8 px-4 shadow-sm border border-gray-200 sm:rounded-xl sm:px-10">
+          <form className="space-y-6" onSubmit={handleLogin}>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Email address
+              </label>
+              <div className="mt-1">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                  placeholder="you@company.com"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div className="mt-1">
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded cursor-pointer"
+                />
+                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900 cursor-pointer">
+                  Remember me
+                </label>
+              </div>
+
+              <div className="text-sm">
+                <a href="#" className="font-medium text-indigo-600 hover:text-indigo-500 transition-colors">
+                  Forgot your password?
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all"
+              >
+                {isSubmitting ? "Signing in..." : "Sign in"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
