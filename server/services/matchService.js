@@ -1,6 +1,6 @@
 import Role from '../models/Role.js';
 import generateEmbedding from './embeddingService.js';
-import qdrantClient from '../config/qdrant.js';
+
 
 export async function findTopMatchingRoles(resumeEmbedding, limit = 10) {
   try {
