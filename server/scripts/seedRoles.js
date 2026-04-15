@@ -4,6 +4,7 @@ import Role from "../models/Role.js";
 import mongoose from "mongoose";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+import { TaskType } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -390,17 +391,30 @@ const popularRoles = [
 
 async function generateEmbedding(text) {
   const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-  const result = await model.embedContent(text);
+  const result = await model.embedContent({
+    content: { parts: [{ text: text }] }, 
+    taskType: TaskType.RETRIEVAL_DOCUMENT
+  });
   return result.embedding.values;
 }
+
+// Helper function to pause execution
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function seedDatabase() {
   try {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ Connected to MongoDB...");
 
+    // 🧹 Master Cleanup
+    console.log("🧹 Commencing full database wipe...");
     await Role.deleteMany({});
-    console.log("🧹 Cleared existing roles.");
+    
+    // Optional: Wipe other collections if you imported them
+    // await Resume.deleteMany({});
+    // await Company.deleteMany({});
+    
+    console.log("✨ Database is spotless. Starting fresh seed...\n");
 
     let count = 1;
 
@@ -408,7 +422,28 @@ async function seedDatabase() {
       console.log(`[${count}/${popularRoles.length}] Processing: ${role.title}...`);
 
       const textToEmbed = `${role.title}. ${role.description}`;
-      const vectorArray = Array.from(await generateEmbedding(textToEmbed));
+      
+      let vectorArray = null;
+      let success = false;
+      let attempts = 0;
+
+      // 🔄 AUTOMATIC RETRY LOGIC
+      while (!success && attempts < 3) {
+        try {
+          vectorArray = Array.from(await generateEmbedding(textToEmbed));
+          success = true;
+        } catch (err) {
+          attempts++;
+          console.log(`   ⚠️ Network hiccup from Google API. Retrying in 5 seconds... (Attempt ${attempts}/3)`);
+          await sleep(5000); // Wait 5 seconds before retrying
+        }
+      }
+
+      if (!success) {
+        console.error(`❌ Failed to process ${role.title} after 3 attempts. Skipping to next...`);
+        count++;
+        continue; // Skip this one and keep going so the script doesn't crash!
+      }
 
       const newRole = new Role({
         title: role.title,
@@ -417,7 +452,8 @@ async function seedDatabase() {
       });
       await newRole.save();
 
-      await new Promise(resolve => setTimeout(resolve, 500)); 
+      // 🐢 THE SPEED LIMIT: Wait 4 seconds between requests to respect the 15 RPM free tier limit
+      await sleep(4000); 
       count++;
     }
 

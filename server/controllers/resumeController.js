@@ -49,6 +49,7 @@ export const triggerPipeline = async (req, res) => {
     const savedResume = await Resume.findById(resumeId);
     if (!savedResume) return res.status(404).json({ error: "Resume not found" });
 
+    // Keeping this at 3 for the automated pipeline so it doesn't take 10 minutes to draft emails!
     const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
     const fullOutreachResults = [];
 
@@ -101,8 +102,15 @@ export const updateResumeDetails = async (req, res) => {
     if (!resumeId) return res.status(400).json({ error: "Resume ID is required." });
 
     const updatedData = { skills: skills || [], experience: experience || [], projects: projects || [] };
-    const textToEmbed = JSON.stringify(updatedData);
-    const newEmbedding = Array.from(await generateEmbedding(textToEmbed));
+    
+    // Convert JSON into a clean English summary for better matching
+    const skillString = updatedData.skills.join(", ");
+    const expString = updatedData.experience.map(exp => `${exp.role || 'Professional'} at ${exp.company || 'Company'}`).join(". ");
+    
+    const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
+    
+    // 🚀 THE FINAL FIX: Added the "query" parameter so Gemini knows this is for searching the database
+    const newEmbedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
     const updatedResume = await Resume.findByIdAndUpdate(
       resumeId,
@@ -115,7 +123,6 @@ export const updateResumeDetails = async (req, res) => {
       { new: true } 
     );
 
-    // 🛑 This is the section that was accidentally deleted!
     res.status(200).json({ data: updatedResume });
   } catch (err) {
     console.error(err);
@@ -129,7 +136,8 @@ export const matchRolesForResume = async (req, res) => {
     const savedResume = await Resume.findById(resumeId);
     if (!savedResume) return res.status(404).json({ error: "Resume not found" });
     
-    const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
+    // You can safely change this number to 5 or 10 if you want to show more roles in the manual UI!
+    const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 10);
     res.status(200).json({ data: matchedRoles });
   } catch (err) {
     res.status(500).json({ error: err.message });

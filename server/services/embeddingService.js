@@ -1,36 +1,17 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import dotenv from "dotenv";
-dotenv.config();
+import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 
-async function generateEmbedding(text) {
-  try {
-    if (!text || text.trim() === "") {
-      throw new Error("Empty text for embedding");
-    }
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+export default async function generateEmbedding(text, type) {
+  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+  
+  const taskType = type === "document" ? TaskType.RETRIEVAL_DOCUMENT : TaskType.RETRIEVAL_QUERY;
 
-    const model = genAI.getGenerativeModel({
-      model: "gemini-embedding-2-preview", // ✅ FIXED MODEL NAME
-    });
-
-    const result = await model.embedContent({
-      content: {
-        parts: [{ text }],
-      },
-    });
-
-    const embedding = result.embedding.values;
-
-    if (!embedding || embedding.length === 0) {
-      throw new Error("Embedding generation returned empty values");
-    }
-
-    return embedding;
-  } catch (err) {
-    console.error("❌ Embedding Error:", err.message);
-    throw new Error("Failed to generate vector");
-  }
+  const result = await model.embedContent({
+    // 🚀 THE FIX: Wrapped the string in the required 'parts' array format
+    content: { parts: [{ text: text }] }, 
+    taskType: taskType
+  });
+  
+  return result.embedding.values;
 }
-
-export default generateEmbedding;

@@ -19,7 +19,7 @@ async function extractText(file) {
 async function parseResume(text) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   
-  // Using the stable flash model to prevent 503 demand spikes
+  // ⏪ REVERTED: Back to the model that was working perfectly for your setup!
   const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
 
   const prompt = `Extract structured data from resume. Return ONLY JSON: {"skills": [], "experience": [{"company": "", "role": "", "duration": "", "description": ""}]} \n\nResume:\n${text}`;
@@ -36,8 +36,17 @@ async function processResume(file) {
   const text = await extractText(file);
   const parsed = await parseResume(text);
   
-  // Generate the 3072-dimension vector from Gemini
-  const embedding = Array.from(await generateEmbedding(JSON.stringify(parsed)));
+  // -------------------------------------------------------------
+  // Convert JSON into a clean English summary
+  // -------------------------------------------------------------
+  const skillString = (parsed.skills || []).join(", ");
+  const expString = (parsed.experience || []).map(exp => `${exp.role} at ${exp.company}`).join(". ");
+  
+  // This creates a sentence structure identical to how the roles are seeded!
+  const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
+  
+  // 🚀 Keeping the "query" flag here so Gemini still knows this is for database searching!
+  const embedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
   const newResume = new Resume({
     skills: parsed.skills || [],
@@ -45,7 +54,6 @@ async function processResume(file) {
     embedding: embedding,
   });
 
-  // 🚀 Just save to MongoDB! Atlas Vector Search handles the indexing automatically.
   const savedResume = await newResume.save();
 
   return savedResume;

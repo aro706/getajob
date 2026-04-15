@@ -1,36 +1,35 @@
 import Role from '../models/Role.js';
 
-export async function findTopMatchingRoles(resumeEmbedding, limit = 5) {
+export async function findTopMatchingRoles(resumeEmbedding, limit = 10) {
   try {
     const matchedRoles = await Role.aggregate([
       {
         $vectorSearch: {
-          index: "vector_index", // The name of the index you created in the Atlas UI
+          index: "vector_index", 
           path: "embedding",
           queryVector: Array.from(resumeEmbedding),
-          numCandidates: 100, // How many documents to check
-          limit: limit
+          numCandidates: 100, 
+          limit: limit // This will now accept 10
         }
       },
       {
-        // Calculate the percentage score (MongoDB returns score directly in the pipeline)
         $project: {
           _id: 1,
           title: 1,
           description: 1,
           score: { $meta: "vectorSearchScore" }
         }
-      },
-      {
-        // Optional: Filter out bad matches (equivalent to score_threshold)
-        $match: {
-          score: { $gte: 0.55 } 
-        }
       }
+      // 🛑 The threshold filter has been completely removed for debugging
     ]);
 
+    console.log("\n🔍 TOP 10 RAW MONGODB SCORES:");
+    matchedRoles.forEach((match, i) => {
+      console.log(`${i + 1}. ${match.title}: ${match.score}`);
+    });
+
     if (!matchedRoles || matchedRoles.length === 0) {
-      console.log("⚠️ No roles met the minimum matching threshold.");
+      console.log("⚠️ No roles found.");
       return [];
     }
 
