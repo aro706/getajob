@@ -40,6 +40,8 @@ export const uploadResume = async (req, res) => {
     });
   }
 };
+// Add this helper function right above triggerPipeline
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const triggerPipeline = async (req, res) => {
   try {
@@ -49,20 +51,57 @@ export const triggerPipeline = async (req, res) => {
     const savedResume = await Resume.findById(resumeId);
     if (!savedResume) return res.status(404).json({ error: "Resume not found" });
 
-    // Keeping this at 3 for the automated pipeline so it doesn't take 10 minutes to draft emails!
     const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 3);
     const fullOutreachResults = [];
 
     for (const match of matchedRoles) {
-      const contacts = await runOutreachPipeline(match.title);
+      const rawContacts = await runOutreachPipeline(match.title);
+      
+      // -----------------------------------------------------------------
+      // 🚀 THE SMART FILTER: Max 5 Companies, Max 2 HRs per Company
+      // -----------------------------------------------------------------
+      const filteredContacts = [];
+      const companyCounts = {};
+      let distinctCompanies = 0;
+
+      for (const hr of rawContacts) {
+        if (!hr.company) continue; // Skip if no company name
+        
+        // Normalize company name to catch slight variations (e.g., "Tudip" vs "tudip")
+        const compName = hr.company.toLowerCase().trim();
+
+        if (!companyCounts[compName]) {
+          // If we already have 5 distinct companies, ignore any new companies
+          if (distinctCompanies >= 5) continue; 
+          
+          companyCounts[compName] = 0;
+          distinctCompanies++;
+        }
+
+        // If we already have 2 HRs from this specific company, skip them
+        if (companyCounts[compName] >= 2) continue;
+
+        // If they passed the checks, add them to our final list!
+        filteredContacts.push(hr);
+        companyCounts[compName]++;
+      }
+      // -----------------------------------------------------------------
+
       const enrichedContacts = [];
 
-      for (const hr of contacts) {
+      // Now we only ask Gemini to write emails for the strictly filtered list!
+      for (const hr of filteredContacts) {
         let aiDrafts = null;
         if (hr.name && hr.company) {
            try {
              aiDrafts = await generateEmailDrafts(savedResume, hr.company, match.title, hr.name);
-           } catch (draftError) {}
+             
+             // 🐢 THE SPEED LIMIT: Wait 2 seconds before writing the next email
+             // This prevents the "429 Too Many Requests" concurrency error!
+             await sleep(2000); 
+           } catch (draftError) {
+             console.error(`⚠️ Failed to draft email for ${hr.name}:`, draftError.message);
+           }
         }
 
         enrichedContacts.push({
@@ -80,7 +119,7 @@ export const triggerPipeline = async (req, res) => {
       fullOutreachResults.push({
         targetRole: match.title,
         matchPercentage: match.matchPercentage,
-        totalFound: contacts.length,
+        totalFound: filteredContacts.length,
         hrContacts: enrichedContacts,
       });
     }
@@ -92,9 +131,11 @@ export const triggerPipeline = async (req, res) => {
       },
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: "Ultimate Processing failed" });
   }
 };
+
 
 export const updateResumeDetails = async (req, res) => {
   try {

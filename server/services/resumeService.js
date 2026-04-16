@@ -18,16 +18,32 @@ async function extractText(file) {
   throw new Error("Unsupported file format. Please upload a PDF or DOCX.");
 }
 
+// 🛡️ The Bulletproof Retry Wrapper
+async function generateWithRetry(model, prompt, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await model.generateContent(prompt);
+    } catch (error) {
+      if (error.status === 429 || (error.message && error.message.includes("429"))) {
+        console.log(`\n⏳ [Rate Limit Hit - Parser] Quota exceeded. Pausing for 62 seconds... (Attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, 62000));
+      } else {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Failed to parse resume after maximum retries.");
+}
+
 async function parseResume(text) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-3-flash-preview" 
-  });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
   const prompt = `Extract structured data from resume. Return ONLY JSON: {"skills": [], "experience": [{"company": "", "role": "", "duration": "", "description": ""}]} \n\nResume:\n${text}`;
 
-  const result = await model.generateContent(prompt);
+  // Use the retry wrapper here!
+  const result = await generateWithRetry(model, prompt);
+  
   let output = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
   const match = output.match(/\{[\s\S]*\}/);
   if (match) output = match[0];
@@ -88,7 +104,6 @@ async function processResume(file) {
   const text = await extractText(file);
   const parsed = await parseResume(text);
   
-  // ✅ Convert structured data → semantic natural language
   const skillString = (parsed.skills || []).join(", ");
   const expString = (parsed.experience || [])
     .map(exp => `${exp.role || 'Professional'} at ${exp.company || 'Company'}`)
@@ -96,8 +111,7 @@ async function processResume(file) {
   
   const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
   
-  // ✅ FIXED: use "document" mode for stored embeddings
-  const mainEmbedding = Array.from(await generateEmbedding(textToEmbed, "document"));
+  const embedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
   const newResume = new Resume({
     skills: parsed.skills || [],

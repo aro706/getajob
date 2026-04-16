@@ -26,7 +26,7 @@ export async function fetchRawCompanies(role) {
 
 export async function filterCompaniesWithGemini(results) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-3-flash-preview" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
   const prompt = `
 You are an expert tech recruiter based in India.
@@ -84,7 +84,7 @@ export async function extractHR(results) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-3-flash-preview"
+    model: "gemini-2.5-flash-lite"
   });
 
   const prompt = `
