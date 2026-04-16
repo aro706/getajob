@@ -20,6 +20,7 @@ import jobRoutes from "./routes/jobRoutes.js";
 // NEW: Import the outreach routes
 import outreachRoutes from "./routes/outreachRoutes.js"; 
 import roadmapRoutes from "./routes/roadmapRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
 
 // --- Model Imports ---
 import Role from "./models/Role.js";
@@ -41,6 +42,7 @@ app.use("/api/resumes", resumeRoutes);
 app.use("/api/jobs", jobRoutes);
 // NEW: Mount the outreach routes so they are accessible
 app.use("/api/outreach", outreachRoutes); 
+app.use("/api/auth", authRoutes);
 
 // --- Standalone Routes ---
 // Health check route

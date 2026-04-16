@@ -2,12 +2,17 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { UploadCloud, CheckCircle2, ChevronRight, FileText, Building2 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext'; // NEW: Added for auth functionality
 
 const AspirantDashboard = () => {
   const navigate = useNavigate();
   const inputRef = useRef(null);
   
-  // ADDED: The Mode Toggle State
+  // Auth State
+  const { user, logout } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
+  // Pipeline State
   const [mode, setMode] = useState('auto');
   const [step, setStep] = useState(1);
   const [file, setFile] = useState(null);
@@ -132,20 +137,56 @@ const AspirantDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      {/* Top Navbar */}
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
+      
+      {/* NEW: Top Navigation Bar with Profile Dropdown */}
+      <nav className="bg-white border-b border-gray-200 px-8 py-3 flex justify-between items-center shadow-sm relative z-20">
         <h1 className="text-xl font-bold text-indigo-600 tracking-tight">HireAI</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-500">Workspace</span>
-          <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
-            US
-          </div>
+        
+        <div className="relative">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex items-center space-x-3 focus:outline-none p-1 rounded-full hover:bg-gray-50 transition-colors"
+          >
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-semibold text-gray-700 leading-tight">
+                {user?.name || 'Aspirant'}
+              </p>
+              <p className="text-xs text-gray-500 font-medium">Job Seeker</p>
+            </div>
+            
+            {user?.picture ? (
+              <img 
+                src={user.picture} 
+                alt="Profile" 
+                className="w-9 h-9 rounded-full border border-gray-200 object-cover shadow-sm" 
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200 shadow-sm">
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+            )}
+          </button>
+
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 border border-gray-200 z-30">
+              <div className="px-4 py-2 border-b border-gray-100">
+                <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+              <button
+                onClick={logout}
+                className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
-      </header>
+      </nav>
 
       <main className="max-w-4xl mx-auto py-12 px-6">
         
-        {/* ADDED: The Mode Toggle Switch */}
+        {/* The Mode Toggle Switch */}
         <div className="flex justify-center mb-8">
           <div className="bg-gray-200 p-1 rounded-lg inline-flex shadow-inner">
             <button 

@@ -6,6 +6,7 @@ import Login from './pages/auth/Login';
 import AspirantDashboard from './pages/aspirant/Dashboard';
 import ResultsDashboard from './pages/aspirant/ResultsDashboard';
 import RecruiterDashboard from './pages/recruiter/Dashboard';
+import Signup from './pages/auth/Signup';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
           <Route element={<ProtectedRoute allowedRoles={['aspirant']} />}>
             <Route path="/aspirant/dashboard" element={<AspirantDashboard />} />
