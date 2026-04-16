@@ -16,31 +16,48 @@ async function extractText(file) {
   throw new Error("Unsupported file format. Please upload a PDF or DOCX.");
 }
 
-// 🛡️ The Bulletproof Retry Wrapper
-async function generateWithRetry(model, prompt, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await model.generateContent(prompt);
-    } catch (error) {
-      if (error.status === 429 || (error.message && error.message.includes("429"))) {
-        console.log(`\n⏳ [Rate Limit Hit - Parser] Quota exceeded. Pausing for 62 seconds... (Attempt ${attempt}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 62000));
-      } else {
-        throw error;
+// 🛡️ The Waterfall Fallback Wrapper
+async function generateWithFallback(genAI, prompt) {
+  const FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash-lite"
+  ];
+
+  // We will run through the list of models twice just in case
+  for (let cycle = 1; cycle <= 2; cycle++) {
+    for (const modelName of FALLBACK_MODELS) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent(prompt);
+        return result; // Success! Return the data.
+      } catch (error) {
+        const isBusy = error.status === 429 || error.status === 503 || 
+                       (error.message && (error.message.includes("429") || error.message.includes("503")));
+        
+        if (isBusy) {
+          console.log(`⚠️ [${modelName}] is busy/rate-limited. Instantly switching to next model...`);
+          await new Promise(resolve => setTimeout(resolve, 500)); // Tiny 0.5s breather
+          continue; // Move to the next model in the array
+        } else {
+          throw error; // If it's a completely different error, crash normally
+        }
       }
     }
+    console.log(`\n⏳ All models are currently overloaded. Taking a 30s breather before Cycle ${cycle + 1}...`);
+    await new Promise(resolve => setTimeout(resolve, 30000));
   }
-  throw new Error("Failed to parse resume after maximum retries.");
+  throw new Error("Failed to parse resume: All fallback models exhausted.");
 }
 
 async function parseResume(text) {
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
+  
   const prompt = `Extract structured data from resume. Return ONLY JSON: {"skills": [], "experience": [{"company": "", "role": "", "duration": "", "description": ""}]} \n\nResume:\n${text}`;
 
-  // Use the retry wrapper here!
-  const result = await generateWithRetry(model, prompt);
+  // Use the new fallback wrapper!
+  const result = await generateWithFallback(genAI, prompt);
   
   let output = result.response.text().replace(/```json/g, "").replace(/```/g, "").trim();
   const match = output.match(/\{[\s\S]*\}/);
@@ -60,7 +77,6 @@ async function processResume(file) {
   
   const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
   
-  // ✅ FIXED: Renamed to mainEmbedding to stop the ReferenceError crash
   const mainEmbedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
   const newResume = new Resume({

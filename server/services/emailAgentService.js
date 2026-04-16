@@ -2,45 +2,53 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 🛡️ The Bulletproof Retry Wrapper (From the API fix branch)
-async function generateWithRetry(model, prompt, maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await model.generateContent(prompt);
-    } catch (error) {
-      if (error.status === 429 || (error.message && error.message.includes("429"))) {
-        console.log(`\n⏳ [Rate Limit Hit] Google needs a minute to reset the quota. Pausing for 62 seconds... (Attempt ${attempt}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, 62000));
-      } else {
-        throw error;
+// 🛡️ The Waterfall Fallback Wrapper (with JSON Support)
+async function generateWithFallback(prompt) {
+  const FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash-lite"
+  ];
+
+  for (let cycle = 1; cycle <= 2; cycle++) {
+    for (const modelName of FALLBACK_MODELS) {
+      try {
+        const model = genAI.getGenerativeModel({ 
+          model: modelName,
+          generationConfig: { responseMimeType: "application/json" } // Force JSON
+        });
+        
+        return await model.generateContent(prompt);
+      } catch (error) {
+        const isBusy = error.status === 429 || error.status === 503 || 
+                       (error.message && (error.message.includes("429") || error.message.includes("503")));
+        
+        if (isBusy) {
+          console.log(`⚠️ Email Agent: [${modelName}] busy. Switching models...`);
+          await new Promise(resolve => setTimeout(resolve, 500)); 
+          continue;
+        } else {
+          throw error;
+        }
       }
     }
+    console.log(`\n⏳ Email Agent: All models overloaded. Pausing 30s before Cycle ${cycle + 1}...`);
+    await new Promise(resolve => setTimeout(resolve, 30000));
   }
-  throw new Error("Failed to generate content after maximum retries.");
+  throw new Error("Failed to generate email drafts: All fallback models exhausted.");
 }
 
-/**
- * Generates 3 variations of cold emails using Gemini AI.
- * Merges JSON mode for consistent parsing WITH rate-limit protection.
- */
 export const generateEmailDrafts = async (resume, companyName, roleTitle, hrName) => {
   if (!process.env.GEMINI_API_KEY) {
     throw new Error("GEMINI_API_KEY is missing!");
   }
 
-  // 🚀 Using the modern, high-capacity model WITH JSON formatting forced
-  const model = genAI.getGenerativeModel({ 
-    model: "gemini-2.5-flash",
-    generationConfig: { responseMimeType: "application/json" }
-  });
-
-  // Safely extract resume details for the prompt
   const candidateSkills = resume.skills ? resume.skills.join(", ") : "Not specified";
   const candidateExperience = resume.experience && resume.experience.length > 0 
     ? resume.experience.map(e => `${e.role || 'Professional'} at ${e.company || 'Company'}`).join(", ") 
     : "Not specified";
 
-  // The 3-variation prompt (From your HEAD branch)
   const prompt = `
       You are an expert technical recruiter and career coach. Draft 3 high-conversion cold email variations.
       
@@ -64,8 +72,8 @@ export const generateEmailDrafts = async (resume, companyName, roleTitle, hrName
   `;
 
   try {
-    // 🛡️ Passing the JSON prompt through the retry wrapper!
-    const result = await generateWithRetry(model, prompt);
+    // 🛡️ Passing the prompt through the new waterfall wrapper!
+    const result = await generateWithFallback(prompt);
     let text = result.response.text();
 
     try {
