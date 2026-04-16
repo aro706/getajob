@@ -2,9 +2,7 @@ import pdf from "pdf-parse/lib/pdf-parse.js";
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Resume from "../models/Resume.js";
-
-import { v4 as uuidv4 } from "uuid";
-import generateEmbedding, { chunkText } from "./embeddingService.js";
+import generateEmbedding from "./embeddingService.js";
 
 async function extractText(file) {
   if (file.mimetype === "application/pdf") {
@@ -51,55 +49,6 @@ async function parseResume(text) {
   return JSON.parse(output);
 }
 
-// Ensure the Qdrant collection exists
-async function ensureRAGCollection() {
-  try {
-    const response = await qdrantClient.getCollections();
-    const collectionName = "resume_chunks";
-    const exists = response.collections.some(c => c.name === collectionName);
-    
-    if (!exists) {
-      console.log(`🚀 Creating collection: ${collectionName}`);
-      await qdrantClient.createCollection(collectionName, { 
-        vectors: { 
-          size: 3072,  // ✅ MUST match embedding model
-          distance: "Cosine" 
-        } 
-      });
-    }
-  } catch (err) {
-    console.error("Collection check error:", err);
-  }
-}
-
-// RAG chunk storage
-export const processResumeRAG = async (resumeId, fullText) => {
-  const chunks = chunkText(fullText);
-  console.log(`📦 Found ${chunks.length} chunks. Starting Qdrant storage...`);
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    const vector = await generateEmbedding(chunk, "document"); // ✅ correct mode
-    
-    await qdrantClient.upsert("resume_chunks", {
-      wait: true,
-      points: [{
-        id: uuidv4(),
-        vector: vector,
-        payload: {
-          resumeId: resumeId.toString(),
-          text: chunk 
-        }
-      }]
-    });
-
-    console.log(`✅ Chunk ${i + 1}/${chunks.length} stored in Qdrant.`);
-    console.log(`   └─ ID: ${resumeId} | Vector Size: ${vector.length}`);
-  }
-
-  console.log("🚀 ALL embeddings stored in Qdrant collection 'resume_chunks'.");
-};
-
 async function processResume(file) {
   const text = await extractText(file);
   const parsed = await parseResume(text);
@@ -111,7 +60,8 @@ async function processResume(file) {
   
   const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
   
-  const embedding = Array.from(await generateEmbedding(textToEmbed, "query"));
+  // ✅ FIXED: Renamed to mainEmbedding to stop the ReferenceError crash
+  const mainEmbedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
   const newResume = new Resume({
     skills: parsed.skills || [],
@@ -121,11 +71,7 @@ async function processResume(file) {
 
   const savedResume = await newResume.save();
 
-  // RAG pipeline
-  await ensureRAGCollection();
-  await processResumeRAG(savedResume._id, text);
-
-  console.log("✅ Resume processed with RAG successfully!");
+  console.log("✅ Resume processed and saved to MongoDB successfully!");
 
   return savedResume;
 }

@@ -1,8 +1,9 @@
-import qdrantClient from "../config/qdrant.js";
+import mongoose from "mongoose";
 import generateEmbedding from "../services/embeddingService.js";
-import { v4 as uuidv4 } from "uuid";
+import LearningResource from "../models/LearningResource.js";
+import dotenv from "dotenv";
 
-// server/scripts/seedLearning.js
+dotenv.config();
 
 const learningData = [
   // Core Web & Software Development
@@ -34,20 +35,30 @@ const learningData = [
 
 async function seed() {
   try {
-    // Create the collection with 768 dimensions for Gemini
-    await qdrantClient.createCollection("learning_resources", {
-      vectors: { size: 768, distance: "Cosine" }
-    });
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ Connected to MongoDB...");
+
+    console.log("🧹 Clearing existing learning resources...");
+    await LearningResource.deleteMany({});
 
     for (const item of learningData) {
-      const vector = await generateEmbedding(item.content);
-      await qdrantClient.upsert("learning_resources", {
-        points: [{ id: uuidv4(), vector, payload: item }]
+      const vector = await generateEmbedding(item.content, "document");
+      
+      const newResource = new LearningResource({
+        goal: item.goal,
+        content: item.content,
+        embedding: Array.from(vector)
       });
+
+      await newResource.save();
     }
-    console.log("✅ Learning resources seeded!");
+    
+    console.log("✅ Learning resources perfectly seeded to MongoDB!");
+    process.exit(0);
   } catch (err) {
-    console.error("Seeding failed:", err);
+    console.error("❌ Seeding failed:", err);
+    process.exit(1);
   }
 }
+
 seed();

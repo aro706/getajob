@@ -1,6 +1,4 @@
 import Role from '../models/Role.js';
-import generateEmbedding from './embeddingService.js';
-
 
 export async function findTopMatchingRoles(resumeEmbedding, limit = 10) {
   try {
@@ -24,7 +22,7 @@ export async function findTopMatchingRoles(resumeEmbedding, limit = 10) {
       }
     ]);
 
-    // ✅ Debug logging (keep this)
+    // ✅ Debug logging
     console.log("\n🔍 RAW MONGODB SCORES:");
     matchedRoles.forEach((match, i) => {
       console.log(`${i + 1}. ${match.title}: ${match.score}`);
@@ -35,12 +33,11 @@ export async function findTopMatchingRoles(resumeEmbedding, limit = 10) {
       return [];
     }
 
-    // ✅ Apply threshold AFTER logging (best of both worlds)
+    // ✅ Apply threshold AFTER logging
     const filteredRoles = matchedRoles.filter(match => match.score >= 0.55);
 
     if (filteredRoles.length === 0) {
       console.log("⚠️ No roles met threshold. Returning top matches anyway for debugging.");
-      // fallback → return top results without filtering
       return matchedRoles.map((match) => ({
         id: match._id.toString(),
         title: match.title,
@@ -59,27 +56,5 @@ export async function findTopMatchingRoles(resumeEmbedding, limit = 10) {
   } catch (error) {
     console.error("Match Service Error (MongoDB Vector):", error);
     throw error;
-  }
-}
-
-export async function getRelevantResumeContext(roleTitle, resumeId) {
-  try {
-    // ✅ IMPORTANT: use query mode for retrieval
-    const queryVector = await generateEmbedding(roleTitle, "query");
-
-    const searchResults = await qdrantClient.search("resume_chunks", {
-      vector: queryVector,
-      filter: {
-        must: [{ key: "resumeId", match: { value: resumeId.toString() } }]
-      },
-      limit: 3,
-      with_payload: true
-    });
-
-    return searchResults.map(res => res.payload.text).join("\n\n");
-
-  } catch (error) {
-    console.error("RAG Retrieval Error:", error);
-    return "";
   }
 }

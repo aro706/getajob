@@ -7,6 +7,8 @@ import Resume from "../models/Resume.js";
 import generateEmbedding from "../services/embeddingService.js";
 import { fetchRawCompanies } from "../services/discoveryService.js";
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 export const uploadResume = async (req, res) => {
   try {
     if (!req.file) {
@@ -40,8 +42,6 @@ export const uploadResume = async (req, res) => {
     });
   }
 };
-// Add this helper function right above triggerPipeline
-const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const triggerPipeline = async (req, res) => {
   try {
@@ -57,47 +57,36 @@ export const triggerPipeline = async (req, res) => {
     for (const match of matchedRoles) {
       const rawContacts = await runOutreachPipeline(match.title);
       
-      // -----------------------------------------------------------------
-      // 🚀 THE SMART FILTER: Max 5 Companies, Max 2 HRs per Company
-      // -----------------------------------------------------------------
+      // The Smart Filter
       const filteredContacts = [];
       const companyCounts = {};
       let distinctCompanies = 0;
 
       for (const hr of rawContacts) {
-        if (!hr.company) continue; // Skip if no company name
+        if (!hr.company) continue;
         
-        // Normalize company name to catch slight variations (e.g., "Tudip" vs "tudip")
         const compName = hr.company.toLowerCase().trim();
 
         if (!companyCounts[compName]) {
-          // If we already have 5 distinct companies, ignore any new companies
           if (distinctCompanies >= 5) continue; 
           
           companyCounts[compName] = 0;
           distinctCompanies++;
         }
 
-        // If we already have 2 HRs from this specific company, skip them
         if (companyCounts[compName] >= 2) continue;
 
-        // If they passed the checks, add them to our final list!
         filteredContacts.push(hr);
         companyCounts[compName]++;
       }
-      // -----------------------------------------------------------------
 
       const enrichedContacts = [];
 
-      // Now we only ask Gemini to write emails for the strictly filtered list!
       for (const hr of filteredContacts) {
         let aiDrafts = null;
         if (hr.name && hr.company) {
            try {
              aiDrafts = await generateEmailDrafts(savedResume, hr.company, match.title, hr.name);
-             
-             // 🐢 THE SPEED LIMIT: Wait 2 seconds before writing the next email
-             // This prevents the "429 Too Many Requests" concurrency error!
              await sleep(2000); 
            } catch (draftError) {
              console.error(`⚠️ Failed to draft email for ${hr.name}:`, draftError.message);
@@ -136,7 +125,6 @@ export const triggerPipeline = async (req, res) => {
   }
 };
 
-
 export const updateResumeDetails = async (req, res) => {
   try {
     const { resumeId, skills, experience, projects } = req.body;
@@ -148,15 +136,12 @@ export const updateResumeDetails = async (req, res) => {
       projects: projects || [] 
     };
     
-    // ✅ Convert structured data → semantic natural language (BETTER embeddings)
     const skillString = updatedData.skills.join(", ");
     const expString = updatedData.experience
       .map(exp => `${exp.role || 'Professional'} at ${exp.company || 'Company'}`)
       .join(". ");
     
     const textToEmbed = `Software and Tech Professional. Skills include: ${skillString}. Experience includes: ${expString}.`;
-    
-    // ✅ Use query mode for better search alignment
     const newEmbedding = Array.from(await generateEmbedding(textToEmbed, "query"));
 
     const updatedResume = await Resume.findByIdAndUpdate(
@@ -174,22 +159,7 @@ export const updateResumeDetails = async (req, res) => {
       return res.status(404).json({ error: "Resume not found in database." });
     }
 
-    // ✅ RAG sync (correct way)
-    console.log("🔄 Rebuilding RAG chunks for updated resume...");
-
-    await qdrantClient.delete("resume_chunks", {
-      wait: true,
-      filter: {
-        must: [
-          { key: "resumeId", match: { value: String(resumeId) } }
-        ]
-      }
-    });
-
-    const fullText = JSON.stringify(updatedData); // better if you store original resume text
-    await processResumeRAG(resumeId, fullText);
-
-    console.log("✅ Resume successfully updated in MongoDB + Qdrant!");
+    console.log("✅ Resume details successfully updated in MongoDB!");
 
     res.status(200).json({
       message: "Resume details and embeddings updated successfully!",
@@ -208,7 +178,6 @@ export const matchRolesForResume = async (req, res) => {
     const savedResume = await Resume.findById(resumeId);
     if (!savedResume) return res.status(404).json({ error: "Resume not found" });
     
-    // You can safely change this number to 5 or 10 if you want to show more roles in the manual UI!
     const matchedRoles = await findTopMatchingRoles(savedResume.embedding, 10);
     res.status(200).json({ data: matchedRoles });
   } catch (err) {
