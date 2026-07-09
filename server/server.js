@@ -1,11 +1,6 @@
-
-
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const dns = require("dns");
 
-// Fix for Node 17+ localhost MongoDB connection issues
-dns.setDefaultResultOrder("ipv4first");
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -30,6 +25,7 @@ const app = express();
 
 // --- Database Connection ---
 connectDB();
+
 
 // --- Middleware ---
 app.use(cors());

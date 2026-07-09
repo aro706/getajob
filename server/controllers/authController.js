@@ -10,6 +10,7 @@ const generateToken = (id) => {
 
 export const registerUser = async (req, res) => {
   try {
+    console.log("===== REGISTER API HIT =====");
     const { name, email, password, role } = req.body;
 
     // Check if user already exists
@@ -40,21 +41,34 @@ export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find the user by email
+    console.log("Login attempt:", email);
+
     const user = await User.findOne({ email });
 
-    // Verify user exists and password matches
-    if (user && (await user.matchPassword(password))) {
+
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    const isMatch = await user.matchPassword(password);
+
+    console.log("Password Match:", isMatch);
+
+    if (isMatch) {
       res.status(200).json({
         message: "Login successful",
-        user: { _id: user._id, name: user.name, email: user.email, role: user.role },
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
         token: generateToken(user._id),
       });
     } else {
-      res.status(401).json({ error: "Invalid email or password" });
+      res.status(401).json({ error: "Incorrect password" });
     }
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Failed to log in" });
+  } catch (err) {
+    console.error(err);
   }
 };

@@ -8,7 +8,7 @@ const experienceSchema = new mongoose.Schema({
   description: String,
 });
 
-// NEW: Schema for tracking email drafts and outreach status
+// Schema for tracking email drafts and outreach status
 const outreachAttemptSchema = new mongoose.Schema({
   companyName: String,
   roleTitle: String,
@@ -47,6 +47,12 @@ const resumeSchema = new mongoose.Schema({
   outreachAttempts: {
     type: [outreachAttemptSchema],
     default: []
+  },
+  // OPTIMIZATION: Unique cryptographic hash of the raw uploaded file buffer
+  fileHash: {
+    type: String,
+    unique: true, // Guarantees database constraint protection against duplicate vector rendering
+    sparse: true  // Allows old records lacking a hash signature to coexist cleanly without indexing errors
   },
   createdAt: {
     type: Date,
