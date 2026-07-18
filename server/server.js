@@ -1,11 +1,6 @@
-
-
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
-const dns = require("dns");
 
-// Fix for Node 17+ localhost MongoDB connection issues
-dns.setDefaultResultOrder("ipv4first");
 
 import dotenv from "dotenv";
 dotenv.config();
@@ -30,6 +25,7 @@ const app = express();
 
 // --- Database Connection ---
 connectDB();
+
 
 // --- Middleware ---
 app.use(cors());
@@ -68,8 +64,8 @@ app.get("/api/roles/rankings", async (req, res) => {
   }
 });
 
-// ✅ NEW ROADMAP ROUTE
-app.use("/api/roadmap", roadmapRoutes);
+console.log('[SERVER INIT] Registering /api/roadmap endpoint base path...');
+app.use('/api/roadmap', roadmapRoutes);
 
 // --- Server Startup ---
 const PORT = process.env.PORT || 3000;
