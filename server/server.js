@@ -64,8 +64,8 @@ app.get("/api/roles/rankings", async (req, res) => {
   }
 });
 
-// ✅ NEW ROADMAP ROUTE
-app.use("/api/roadmap", roadmapRoutes);
+console.log('[SERVER INIT] Registering /api/roadmap endpoint base path...');
+app.use('/api/roadmap', roadmapRoutes);
 
 // --- Server Startup ---
 const PORT = process.env.PORT || 3000;

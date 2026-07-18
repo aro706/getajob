@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { 
   UploadCloud, CheckCircle2, ChevronRight, FileText, 
-  Building2, Sparkles, Loader2, AlertCircle, Check, RefreshCw 
+  Building2, Sparkles, Loader2, AlertCircle, Check, RefreshCw, Map 
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -191,11 +191,20 @@ const AspirantDashboard = () => {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col">
       {/* Top Navbar */}
       <nav className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 flex justify-between items-center sticky top-0 z-20 shadow-xs">
-        <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent tracking-tight">
+        <h1 className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent tracking-tight cursor-pointer" onClick={() => navigate('/aspirant/dashboard')}>
           HireAI
         </h1>
         
         <div className="flex items-center gap-4">
+          {/* Roadmap Action Link */}
+          <button
+            onClick={() => navigate('/aspirant/roadmap')}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-600 bg-white rounded-xl text-xs font-semibold transition-all cursor-pointer"
+          >
+            <Map size={13} />
+            Career Roadmap
+          </button>
+
           {hasCachedResume && (
             <button
               onClick={handleClearResumeCache}
@@ -215,7 +224,7 @@ const AspirantDashboard = () => {
                 <p className="text-sm font-semibold text-slate-700 leading-tight">{user?.name || 'Aspirant'}</p>
                 <p className="text-xs text-slate-500 font-medium">Job Seeker</p>
               </div>
-              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200二">
+              <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold border border-indigo-200">
                 {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
               </div>
             </button>
