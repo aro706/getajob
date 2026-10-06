@@ -5,11 +5,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // 🛡️ The Waterfall Fallback Wrapper (with JSON Support)
 async function generateWithFallback(prompt) {
   const FALLBACK_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash-lite"
-  ];
+  "gemini-3.7-flash",
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash"
+];
 
   for (let cycle = 1; cycle <= 2; cycle++) {
     for (const modelName of FALLBACK_MODELS) {
